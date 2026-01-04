@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "196272608738",
+    "project_id": "dims-must",
+    "storage_bucket": "dims-must.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:196272608738:android:400278b4601dbe42e0d5bb",
+        "android_client_info": {
+          "package_name": "com.example.dims"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcb3Re_o5hto7Kri7cQroZ6gWqTsC_WUo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:196272608738:android:302d962a49564f01e0d5bb",
+        "android_client_info": {
+          "package_name": "com.must.dims"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcb3Re_o5hto7Kri7cQroZ6gWqTsC_WUo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
