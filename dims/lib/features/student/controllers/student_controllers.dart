@@ -1,133 +1,149 @@
-// lib/features/student/controllers/student_controllers.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dims/features/auth/controllers/auth_controller.dart';
-import 'package:dims/features/student/data/models/student_profile_model.dart';
-import 'package:dims/features/placements/data/models/placement_model.dart';
-import 'package:dims/features/logbook/data/models/logbook_entry_model.dart';
-import 'package:dims/features/companies/data/models/company_model.dart';
+
+import '../../auth/controllers/auth_controller.dart';
+import '../../auth/data/models/user_model.dart';
+import '../data/models/student_profile_model.dart';
+import '../../placements/data/models/placement_model.dart';
+import '../../companies/data/models/company_model.dart';
+import '../../logbook/data/models/logbook_entry_model.dart';
 
 // ============================================================================
 // STUDENT PROFILE PROVIDERS
 // ============================================================================
 
-/// Get current student's profile
 final studentProfileProvider = StreamProvider<StudentProfileModel?>((ref) {
   final authState = ref.watch(authStateProvider);
   final firestore = ref.watch(firestoreProvider);
-  
+
   final userId = authState.value?.uid;
   if (userId == null) return Stream.value(null);
-  
+
   return firestore
       .collection('students')
       .doc(userId)
       .snapshots()
       .map((doc) {
-    if (!doc.exists) return null;
-    return StudentProfileModel.fromFirestore(doc, null);
-  });
+        if (!doc.exists || doc.data() == null) return null;
+        return StudentProfileModel.fromFirestore(doc, null);
+      })
+      .handleError((e) {
+        print('[StudentProfile] Error: $e');
+        return null;
+      });
 });
 
-/// Check if profile is complete
 final isProfileCompleteProvider = Provider<bool>((ref) {
   final profile = ref.watch(studentProfileProvider).value;
   if (profile == null) return false;
-  
-  // Profile is complete if all required fields are filled
+
   return profile.registrationNumber.isNotEmpty &&
-         profile.program.isNotEmpty &&
-         profile.academicYear > 0 &&
-         profile.currentLevel.isNotEmpty;
+      profile.program.isNotEmpty &&
+      profile.academicYear > 0 &&
+      profile.currentLevel.isNotEmpty;
 });
 
 // ============================================================================
 // PLACEMENT PROVIDERS
 // ============================================================================
 
-/// Get current student's active placement
 final currentPlacementProvider = StreamProvider<PlacementModel?>((ref) {
   final profile = ref.watch(studentProfileProvider).value;
   final firestore = ref.watch(firestoreProvider);
-  
+
   final placementId = profile?.currentPlacementId;
   if (placementId == null) return Stream.value(null);
-  
+
   return firestore
       .collection('placements')
       .doc(placementId)
       .snapshots()
       .map((doc) {
-    if (!doc.exists) return null;
-    return PlacementModel.fromFirestore(doc, null);
-  });
+        if (!doc.exists || doc.data() == null) return null;
+        return PlacementModel.fromFirestore(doc, null);
+      });
 });
 
-/// Get company details for current placement
 final placementCompanyProvider = FutureProvider<CompanyModel?>((ref) async {
   final placement = ref.watch(currentPlacementProvider).value;
   final firestore = ref.watch(firestoreProvider);
-  
+
   final companyPath = placement?.companyRefPath;
   if (companyPath == null) return null;
-  
+
   try {
     final doc = await firestore.doc(companyPath).get();
-    if (!doc.exists) return null;
+    if (!doc.exists || doc.data() == null) return null;
     return CompanyModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>, null);
   } catch (e) {
+    print('[PlacementCompany] Error: $e');
     return null;
   }
 });
 
 // ============================================================================
-// LOGBOOK PROVIDERS
+// LOGBOOK PROVIDERS — Debug-friendly & robust
 // ============================================================================
 
-/// Get all logbook entries for current student with document IDs
 final logbookEntriesProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   final authState = ref.watch(authStateProvider);
   final firestore = ref.watch(firestoreProvider);
-  
+
   final userId = authState.value?.uid;
-  if (userId == null) return Stream.value([]);
-  
+  if (userId == null) {
+    print('[LogbookProvider] No authenticated user → returning empty list');
+    return Stream.value([]);
+  }
+
+  final studentPath = 'students/$userId';
+  print('[LogbookProvider] Starting query for: $studentPath');
+
   return firestore
       .collection('logbook_entries')
-      .where('studentRefPath', isEqualTo: 'students/$userId')
+      .where('studentRefPath', isEqualTo: studentPath)
       .orderBy('date', descending: true)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) {
-      final entry = LogbookEntryModel.fromFirestore(doc, null);
-      return {
-        'id': doc.id,
-        'entry': entry,
-      };
-    }).toList();
-  });
+        print('[LogbookProvider] Snapshot received — ${snapshot.docs.length} entries found');
+        for (final doc in snapshot.docs) {
+          print('  → Doc ${doc.id} | date: ${doc['date']} | status: ${doc['status']}');
+        }
+
+        return snapshot.docs.map((doc) {
+          try {
+            final entry = LogbookEntryModel.fromFirestore(doc, null);
+            return {'id': doc.id, 'entry': entry};
+          } catch (e) {
+            print('[LogbookProvider] Parse error on doc ${doc.id}: $e');
+            return null;
+          }
+        }).whereType<Map<String, dynamic>>().toList();
+      })
+      .handleError((error, stack) {
+        print('[LogbookProvider] Stream error: $error');
+        print('Stack: $stack');
+        return <Map<String, dynamic>>[];
+      });
 });
 
-/// Get pending logbook entries count
 final pendingLogbookCountProvider = Provider<int>((ref) {
   final entries = ref.watch(logbookEntriesProvider).value ?? [];
   return entries.where((e) {
-    final entry = e['entry'] as LogbookEntryModel;
-    return entry.status?.toLowerCase() == 'pending';
+    final status = (e['entry'] as LogbookEntryModel?)?.status?.toLowerCase();
+    return status == 'pending';
   }).length;
 });
 
-/// Get approved logbook entries count
 final approvedLogbookCountProvider = Provider<int>((ref) {
   final entries = ref.watch(logbookEntriesProvider).value ?? [];
   return entries.where((e) {
-    final entry = e['entry'] as LogbookEntryModel;
-    return entry.status?.toLowerCase() == 'approved';
+    final status = (e['entry'] as LogbookEntryModel?)?.status?.toLowerCase();
+    return status == 'approved';
   }).length;
 });
 
 // ============================================================================
-// STUDENT PROFILE CONTROLLER
+// CONTROLLERS
 // ============================================================================
 
 final studentProfileControllerProvider = Provider((ref) {
@@ -136,18 +152,13 @@ final studentProfileControllerProvider = Provider((ref) {
 
 class StudentProfileController {
   final Ref _ref;
-  
   StudentProfileController(this._ref);
-  
+
   FirebaseFirestore get _db => _ref.read(firestoreProvider);
-  
-  /// Create or update student profile
+
   Future<void> saveProfile(String userId, StudentProfileModel profile) async {
     try {
-      await _db
-          .collection('students')
-          .doc(userId)
-          .set(
+      await _db.collection('students').doc(userId).set(
             StudentProfileModel.toFirestore(
               profile.copyWith(
                 updatedAt: DateTime.now(),
@@ -157,27 +168,26 @@ class StudentProfileController {
             ),
             SetOptions(merge: true),
           );
+      print('[ProfileController] Profile saved/updated for $userId');
     } catch (e) {
-      throw Exception('Failed to save profile: $e');
+      print('[ProfileController] Save error: $e');
+      rethrow;
     }
   }
-  
-  /// Update progress percentage
+
   Future<void> updateProgress(String userId, double progress) async {
     try {
       await _db.collection('students').doc(userId).update({
         'progressPercentage': progress,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      print('[ProfileController] Progress updated: $progress%');
     } catch (e) {
-      throw Exception('Failed to update progress: $e');
+      print('[ProfileController] Progress update error: $e');
+      rethrow;
     }
   }
 }
-
-// ============================================================================
-// LOGBOOK CONTROLLER
-// ============================================================================
 
 final logbookControllerProvider = Provider((ref) {
   return LogbookController(ref);
@@ -185,58 +195,53 @@ final logbookControllerProvider = Provider((ref) {
 
 class LogbookController {
   final Ref _ref;
-  
   LogbookController(this._ref);
-  
+
   FirebaseFirestore get _db => _ref.read(firestoreProvider);
-  
-  /// Submit a new logbook entry
+
   Future<void> submitEntry(LogbookEntryModel entry) async {
     try {
       await _db.collection('logbook_entries').add(
-        LogbookEntryModel.toFirestore(
-          entry.copyWith(status: 'pending'),
-          null,
-        ),
-      );
+            LogbookEntryModel.toFirestore(
+              entry.copyWith(status: 'pending'),
+              null,
+            ),
+          );
+      print('[LogbookController] New entry submitted');
     } catch (e) {
-      throw Exception('Failed to submit logbook entry: $e');
+      print('[LogbookController] Submit error: $e');
+      rethrow;
     }
   }
-  
-  /// Update existing logbook entry (only if not approved)
+
   Future<void> updateEntry(String entryId, LogbookEntryModel entry) async {
     try {
-      // Check if entry is approved
       if (entry.status?.toLowerCase() == 'approved') {
         throw Exception('Cannot edit approved entries');
       }
-      
-      await _db
-          .collection('logbook_entries')
-          .doc(entryId)
-          .update(
+      await _db.collection('logbook_entries').doc(entryId).update(
             LogbookEntryModel.toFirestore(entry, null),
           );
+      print('[LogbookController] Entry $entryId updated');
     } catch (e) {
-      throw Exception('Failed to update logbook entry: $e');
+      print('[LogbookController] Update error: $e');
+      rethrow;
     }
   }
-  
-  /// Delete logbook entry (only if not approved)
+
   Future<void> deleteEntry(String entryId, String? status) async {
     try {
       if (status?.toLowerCase() == 'approved') {
         throw Exception('Cannot delete approved entries');
       }
-      
       await _db.collection('logbook_entries').doc(entryId).delete();
+      print('[LogbookController] Entry $entryId deleted');
     } catch (e) {
-      throw Exception('Failed to delete logbook entry: $e');
+      print('[LogbookController] Delete error: $e');
+      rethrow;
     }
   }
-  
-  /// Get next day number for logbook
+
   Future<int> getNextDayNumber(String studentPath) async {
     try {
       final snapshot = await _db
@@ -245,12 +250,13 @@ class LogbookController {
           .orderBy('dayNumber', descending: true)
           .limit(1)
           .get();
-      
+
       if (snapshot.docs.isEmpty) return 1;
-      
+
       final lastEntry = LogbookEntryModel.fromFirestore(snapshot.docs.first, null);
       return lastEntry.dayNumber + 1;
     } catch (e) {
+      print('[LogbookController] Day number error: $e');
       return 1;
     }
   }

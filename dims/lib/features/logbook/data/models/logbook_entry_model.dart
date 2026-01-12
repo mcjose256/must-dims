@@ -8,18 +8,28 @@ part 'logbook_entry_model.g.dart';
 @freezed
 class LogbookEntryModel with _$LogbookEntryModel {
   const factory LogbookEntryModel({
-    String? studentRefPath,
-    String? placementRefPath,
+    String? id, // document ID - useful when editing
+    required String studentRefPath,
+    required String placementRefPath,
     required DateTime date,
     required int dayNumber,
-    required String tasks,
+    required String tasksPerformed, // renamed for better readability
+    String? challenges,
+    String? skillsLearned,
     required double hoursWorked,
+
+    @Default('draft') String status, // draft → submitted → pending → approved/rejected
+    DateTime? createdAt,
+    DateTime? updatedAt,
+
+    // GPS / check-in/out fields (for phase 2)
     double? latitude,
     double? longitude,
     DateTime? checkInTime,
     DateTime? checkOutTime,
-    String? photoUrl,
-    String? status,
+
+    // Supervisor feedback fields
+    String? photoUrl, // optional proof photo
     String? supervisorComment,
     DateTime? approvedAt,
   }) = _LogbookEntryModel;
@@ -27,74 +37,72 @@ class LogbookEntryModel with _$LogbookEntryModel {
   factory LogbookEntryModel.fromJson(Map<String, dynamic> json) =>
       _$LogbookEntryModelFromJson(json);
 
-  // Firestore converters
-  static LogbookEntryModel fromFirestore(
+  // ── Firestore converters ────────────────────────────────────────────────────
+  factory LogbookEntryModel.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
     SnapshotOptions? options,
   ) {
-    final data = doc.data();
-    if (data == null) {
-      throw Exception('Document data is null');
-    }
+    final data = doc.data() ?? {};
 
-    // Helper to parse DateTime from Timestamp or String
-    DateTime? parseDate(dynamic val) {
-      if (val is Timestamp) return val.toDate();
-      if (val is String) return DateTime.tryParse(val);
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
       return null;
     }
 
-    // Parse the date field
-    final dateValue = data['date'];
-    final parsedDate = parseDate(dateValue) ?? DateTime.now();
-
     return LogbookEntryModel(
-      studentRefPath: data['studentRefPath'] as String?,
-      placementRefPath: data['placementRefPath'] as String?,
-      date: parsedDate,
+      id: doc.id,
+      studentRefPath: data['studentRefPath'] as String? ?? '',
+      placementRefPath: data['placementRefPath'] as String? ?? '',
+      date: parseDate(data['date']) ?? DateTime.now(),
       dayNumber: (data['dayNumber'] as num?)?.toInt() ?? 0,
-      tasks: data['tasks'] as String? ?? '',
+      tasksPerformed: data['tasksPerformed'] as String? ?? '',
+      challenges: data['challenges'] as String?,
+      skillsLearned: data['skillsLearned'] as String?,
       hoursWorked: (data['hoursWorked'] as num?)?.toDouble() ?? 0.0,
+      status: data['status'] as String? ?? 'draft',
+      createdAt: parseDate(data['createdAt']),
+      updatedAt: parseDate(data['updatedAt']),
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
       checkInTime: parseDate(data['checkInTime']),
       checkOutTime: parseDate(data['checkOutTime']),
       photoUrl: data['photoUrl'] as String?,
-      status: data['status'] as String? ?? 'pending',
       supervisorComment: data['supervisorComment'] as String?,
       approvedAt: parseDate(data['approvedAt']),
     );
   }
 
   static Map<String, dynamic> toFirestore(
-    LogbookEntryModel entry,
+    LogbookEntryModel entry, [
     SetOptions? options,
-  ) {
-    final json = <String, dynamic>{
+  ]) {
+    final json = {
       'studentRefPath': entry.studentRefPath,
       'placementRefPath': entry.placementRefPath,
       'date': Timestamp.fromDate(entry.date),
       'dayNumber': entry.dayNumber,
-      'tasks': entry.tasks,
+      'tasksPerformed': entry.tasksPerformed,
+      'challenges': entry.challenges,
+      'skillsLearned': entry.skillsLearned,
       'hoursWorked': entry.hoursWorked,
-      'latitude': entry.latitude,
-      'longitude': entry.longitude,
-      'checkInTime': entry.checkInTime != null 
-          ? Timestamp.fromDate(entry.checkInTime!) 
-          : null,
-      'checkOutTime': entry.checkOutTime != null 
-          ? Timestamp.fromDate(entry.checkOutTime!) 
-          : null,
+      'status': entry.status,
+      'createdAt': entry.createdAt != null
+          ? Timestamp.fromDate(entry.createdAt!)
+          : FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (entry.latitude != null) 'latitude': entry.latitude,
+      if (entry.longitude != null) 'longitude': entry.longitude,
+      if (entry.checkInTime != null)
+        'checkInTime': Timestamp.fromDate(entry.checkInTime!),
+      if (entry.checkOutTime != null)
+        'checkOutTime': Timestamp.fromDate(entry.checkOutTime!),
       'photoUrl': entry.photoUrl,
-      'status': entry.status ?? 'pending',
       'supervisorComment': entry.supervisorComment,
-      'approvedAt': entry.approvedAt != null 
-          ? Timestamp.fromDate(entry.approvedAt!) 
-          : null,
-    };
-
-    // Remove null values
-    json.removeWhere((key, value) => value == null);
+      if (entry.approvedAt != null)
+        'approvedAt': Timestamp.fromDate(entry.approvedAt!),
+    }..removeWhere((key, value) => value == null);
 
     return json;
   }

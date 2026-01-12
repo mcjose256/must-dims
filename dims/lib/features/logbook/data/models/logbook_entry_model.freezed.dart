@@ -20,19 +20,29 @@ LogbookEntryModel _$LogbookEntryModelFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$LogbookEntryModel {
-  String? get studentRefPath => throw _privateConstructorUsedError;
-  String? get placementRefPath => throw _privateConstructorUsedError;
+  String? get id =>
+      throw _privateConstructorUsedError; // document ID - useful when editing
+  String get studentRefPath => throw _privateConstructorUsedError;
+  String get placementRefPath => throw _privateConstructorUsedError;
   DateTime get date => throw _privateConstructorUsedError;
   int get dayNumber => throw _privateConstructorUsedError;
-  String get tasks => throw _privateConstructorUsedError;
+  String get tasksPerformed =>
+      throw _privateConstructorUsedError; // renamed for better readability
+  String? get challenges => throw _privateConstructorUsedError;
+  String? get skillsLearned => throw _privateConstructorUsedError;
   double get hoursWorked => throw _privateConstructorUsedError;
-  double? get latitude =>
-      throw _privateConstructorUsedError; // Store GeoPoint as separate coordinates
+  String get status =>
+      throw _privateConstructorUsedError; // draft → submitted → pending → approved/rejected
+  DateTime? get createdAt => throw _privateConstructorUsedError;
+  DateTime? get updatedAt =>
+      throw _privateConstructorUsedError; // GPS / check-in/out fields (for phase 2)
+  double? get latitude => throw _privateConstructorUsedError;
   double? get longitude => throw _privateConstructorUsedError;
   DateTime? get checkInTime => throw _privateConstructorUsedError;
-  DateTime? get checkOutTime => throw _privateConstructorUsedError;
-  String? get photoUrl => throw _privateConstructorUsedError;
-  String? get status => throw _privateConstructorUsedError;
+  DateTime? get checkOutTime =>
+      throw _privateConstructorUsedError; // Supervisor feedback fields
+  String? get photoUrl =>
+      throw _privateConstructorUsedError; // optional proof photo
   String? get supervisorComment => throw _privateConstructorUsedError;
   DateTime? get approvedAt => throw _privateConstructorUsedError;
 
@@ -49,18 +59,23 @@ abstract class $LogbookEntryModelCopyWith<$Res> {
       _$LogbookEntryModelCopyWithImpl<$Res, LogbookEntryModel>;
   @useResult
   $Res call(
-      {String? studentRefPath,
-      String? placementRefPath,
+      {String? id,
+      String studentRefPath,
+      String placementRefPath,
       DateTime date,
       int dayNumber,
-      String tasks,
+      String tasksPerformed,
+      String? challenges,
+      String? skillsLearned,
       double hoursWorked,
+      String status,
+      DateTime? createdAt,
+      DateTime? updatedAt,
       double? latitude,
       double? longitude,
       DateTime? checkInTime,
       DateTime? checkOutTime,
       String? photoUrl,
-      String? status,
       String? supervisorComment,
       DateTime? approvedAt});
 }
@@ -78,30 +93,39 @@ class _$LogbookEntryModelCopyWithImpl<$Res, $Val extends LogbookEntryModel>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? studentRefPath = freezed,
-    Object? placementRefPath = freezed,
+    Object? id = freezed,
+    Object? studentRefPath = null,
+    Object? placementRefPath = null,
     Object? date = null,
     Object? dayNumber = null,
-    Object? tasks = null,
+    Object? tasksPerformed = null,
+    Object? challenges = freezed,
+    Object? skillsLearned = freezed,
     Object? hoursWorked = null,
+    Object? status = null,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
     Object? latitude = freezed,
     Object? longitude = freezed,
     Object? checkInTime = freezed,
     Object? checkOutTime = freezed,
     Object? photoUrl = freezed,
-    Object? status = freezed,
     Object? supervisorComment = freezed,
     Object? approvedAt = freezed,
   }) {
     return _then(_value.copyWith(
-      studentRefPath: freezed == studentRefPath
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String?,
+      studentRefPath: null == studentRefPath
           ? _value.studentRefPath
           : studentRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
-      placementRefPath: freezed == placementRefPath
+              as String,
+      placementRefPath: null == placementRefPath
           ? _value.placementRefPath
           : placementRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as String,
       date: null == date
           ? _value.date
           : date // ignore: cast_nullable_to_non_nullable
@@ -110,14 +134,34 @@ class _$LogbookEntryModelCopyWithImpl<$Res, $Val extends LogbookEntryModel>
           ? _value.dayNumber
           : dayNumber // ignore: cast_nullable_to_non_nullable
               as int,
-      tasks: null == tasks
-          ? _value.tasks
-          : tasks // ignore: cast_nullable_to_non_nullable
+      tasksPerformed: null == tasksPerformed
+          ? _value.tasksPerformed
+          : tasksPerformed // ignore: cast_nullable_to_non_nullable
               as String,
+      challenges: freezed == challenges
+          ? _value.challenges
+          : challenges // ignore: cast_nullable_to_non_nullable
+              as String?,
+      skillsLearned: freezed == skillsLearned
+          ? _value.skillsLearned
+          : skillsLearned // ignore: cast_nullable_to_non_nullable
+              as String?,
       hoursWorked: null == hoursWorked
           ? _value.hoursWorked
           : hoursWorked // ignore: cast_nullable_to_non_nullable
               as double,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       latitude: freezed == latitude
           ? _value.latitude
           : latitude // ignore: cast_nullable_to_non_nullable
@@ -137,10 +181,6 @@ class _$LogbookEntryModelCopyWithImpl<$Res, $Val extends LogbookEntryModel>
       photoUrl: freezed == photoUrl
           ? _value.photoUrl
           : photoUrl // ignore: cast_nullable_to_non_nullable
-              as String?,
-      status: freezed == status
-          ? _value.status
-          : status // ignore: cast_nullable_to_non_nullable
               as String?,
       supervisorComment: freezed == supervisorComment
           ? _value.supervisorComment
@@ -163,18 +203,23 @@ abstract class _$$LogbookEntryModelImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String? studentRefPath,
-      String? placementRefPath,
+      {String? id,
+      String studentRefPath,
+      String placementRefPath,
       DateTime date,
       int dayNumber,
-      String tasks,
+      String tasksPerformed,
+      String? challenges,
+      String? skillsLearned,
       double hoursWorked,
+      String status,
+      DateTime? createdAt,
+      DateTime? updatedAt,
       double? latitude,
       double? longitude,
       DateTime? checkInTime,
       DateTime? checkOutTime,
       String? photoUrl,
-      String? status,
       String? supervisorComment,
       DateTime? approvedAt});
 }
@@ -190,30 +235,39 @@ class __$$LogbookEntryModelImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? studentRefPath = freezed,
-    Object? placementRefPath = freezed,
+    Object? id = freezed,
+    Object? studentRefPath = null,
+    Object? placementRefPath = null,
     Object? date = null,
     Object? dayNumber = null,
-    Object? tasks = null,
+    Object? tasksPerformed = null,
+    Object? challenges = freezed,
+    Object? skillsLearned = freezed,
     Object? hoursWorked = null,
+    Object? status = null,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
     Object? latitude = freezed,
     Object? longitude = freezed,
     Object? checkInTime = freezed,
     Object? checkOutTime = freezed,
     Object? photoUrl = freezed,
-    Object? status = freezed,
     Object? supervisorComment = freezed,
     Object? approvedAt = freezed,
   }) {
     return _then(_$LogbookEntryModelImpl(
-      studentRefPath: freezed == studentRefPath
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String?,
+      studentRefPath: null == studentRefPath
           ? _value.studentRefPath
           : studentRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
-      placementRefPath: freezed == placementRefPath
+              as String,
+      placementRefPath: null == placementRefPath
           ? _value.placementRefPath
           : placementRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as String,
       date: null == date
           ? _value.date
           : date // ignore: cast_nullable_to_non_nullable
@@ -222,14 +276,34 @@ class __$$LogbookEntryModelImplCopyWithImpl<$Res>
           ? _value.dayNumber
           : dayNumber // ignore: cast_nullable_to_non_nullable
               as int,
-      tasks: null == tasks
-          ? _value.tasks
-          : tasks // ignore: cast_nullable_to_non_nullable
+      tasksPerformed: null == tasksPerformed
+          ? _value.tasksPerformed
+          : tasksPerformed // ignore: cast_nullable_to_non_nullable
               as String,
+      challenges: freezed == challenges
+          ? _value.challenges
+          : challenges // ignore: cast_nullable_to_non_nullable
+              as String?,
+      skillsLearned: freezed == skillsLearned
+          ? _value.skillsLearned
+          : skillsLearned // ignore: cast_nullable_to_non_nullable
+              as String?,
       hoursWorked: null == hoursWorked
           ? _value.hoursWorked
           : hoursWorked // ignore: cast_nullable_to_non_nullable
               as double,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       latitude: freezed == latitude
           ? _value.latitude
           : latitude // ignore: cast_nullable_to_non_nullable
@@ -250,10 +324,6 @@ class __$$LogbookEntryModelImplCopyWithImpl<$Res>
           ? _value.photoUrl
           : photoUrl // ignore: cast_nullable_to_non_nullable
               as String?,
-      status: freezed == status
-          ? _value.status
-          : status // ignore: cast_nullable_to_non_nullable
-              as String?,
       supervisorComment: freezed == supervisorComment
           ? _value.supervisorComment
           : supervisorComment // ignore: cast_nullable_to_non_nullable
@@ -270,18 +340,23 @@ class __$$LogbookEntryModelImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$LogbookEntryModelImpl implements _LogbookEntryModel {
   const _$LogbookEntryModelImpl(
-      {this.studentRefPath,
-      this.placementRefPath,
+      {this.id,
+      required this.studentRefPath,
+      required this.placementRefPath,
       required this.date,
       required this.dayNumber,
-      required this.tasks,
+      required this.tasksPerformed,
+      this.challenges,
+      this.skillsLearned,
       required this.hoursWorked,
+      this.status = 'draft',
+      this.createdAt,
+      this.updatedAt,
       this.latitude,
       this.longitude,
       this.checkInTime,
       this.checkOutTime,
       this.photoUrl,
-      this.status,
       this.supervisorComment,
       this.approvedAt});
 
@@ -289,30 +364,46 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
       _$$LogbookEntryModelImplFromJson(json);
 
   @override
-  final String? studentRefPath;
+  final String? id;
+// document ID - useful when editing
   @override
-  final String? placementRefPath;
+  final String studentRefPath;
+  @override
+  final String placementRefPath;
   @override
   final DateTime date;
   @override
   final int dayNumber;
   @override
-  final String tasks;
+  final String tasksPerformed;
+// renamed for better readability
+  @override
+  final String? challenges;
+  @override
+  final String? skillsLearned;
   @override
   final double hoursWorked;
   @override
+  @JsonKey()
+  final String status;
+// draft → submitted → pending → approved/rejected
+  @override
+  final DateTime? createdAt;
+  @override
+  final DateTime? updatedAt;
+// GPS / check-in/out fields (for phase 2)
+  @override
   final double? latitude;
-// Store GeoPoint as separate coordinates
   @override
   final double? longitude;
   @override
   final DateTime? checkInTime;
   @override
   final DateTime? checkOutTime;
+// Supervisor feedback fields
   @override
   final String? photoUrl;
-  @override
-  final String? status;
+// optional proof photo
   @override
   final String? supervisorComment;
   @override
@@ -320,7 +411,7 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
 
   @override
   String toString() {
-    return 'LogbookEntryModel(studentRefPath: $studentRefPath, placementRefPath: $placementRefPath, date: $date, dayNumber: $dayNumber, tasks: $tasks, hoursWorked: $hoursWorked, latitude: $latitude, longitude: $longitude, checkInTime: $checkInTime, checkOutTime: $checkOutTime, photoUrl: $photoUrl, status: $status, supervisorComment: $supervisorComment, approvedAt: $approvedAt)';
+    return 'LogbookEntryModel(id: $id, studentRefPath: $studentRefPath, placementRefPath: $placementRefPath, date: $date, dayNumber: $dayNumber, tasksPerformed: $tasksPerformed, challenges: $challenges, skillsLearned: $skillsLearned, hoursWorked: $hoursWorked, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, latitude: $latitude, longitude: $longitude, checkInTime: $checkInTime, checkOutTime: $checkOutTime, photoUrl: $photoUrl, supervisorComment: $supervisorComment, approvedAt: $approvedAt)';
   }
 
   @override
@@ -328,6 +419,7 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$LogbookEntryModelImpl &&
+            (identical(other.id, id) || other.id == id) &&
             (identical(other.studentRefPath, studentRefPath) ||
                 other.studentRefPath == studentRefPath) &&
             (identical(other.placementRefPath, placementRefPath) ||
@@ -335,9 +427,19 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
             (identical(other.date, date) || other.date == date) &&
             (identical(other.dayNumber, dayNumber) ||
                 other.dayNumber == dayNumber) &&
-            (identical(other.tasks, tasks) || other.tasks == tasks) &&
+            (identical(other.tasksPerformed, tasksPerformed) ||
+                other.tasksPerformed == tasksPerformed) &&
+            (identical(other.challenges, challenges) ||
+                other.challenges == challenges) &&
+            (identical(other.skillsLearned, skillsLearned) ||
+                other.skillsLearned == skillsLearned) &&
             (identical(other.hoursWorked, hoursWorked) ||
                 other.hoursWorked == hoursWorked) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
             (identical(other.latitude, latitude) ||
                 other.latitude == latitude) &&
             (identical(other.longitude, longitude) ||
@@ -348,7 +450,6 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
                 other.checkOutTime == checkOutTime) &&
             (identical(other.photoUrl, photoUrl) ||
                 other.photoUrl == photoUrl) &&
-            (identical(other.status, status) || other.status == status) &&
             (identical(other.supervisorComment, supervisorComment) ||
                 other.supervisorComment == supervisorComment) &&
             (identical(other.approvedAt, approvedAt) ||
@@ -357,22 +458,28 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      studentRefPath,
-      placementRefPath,
-      date,
-      dayNumber,
-      tasks,
-      hoursWorked,
-      latitude,
-      longitude,
-      checkInTime,
-      checkOutTime,
-      photoUrl,
-      status,
-      supervisorComment,
-      approvedAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        studentRefPath,
+        placementRefPath,
+        date,
+        dayNumber,
+        tasksPerformed,
+        challenges,
+        skillsLearned,
+        hoursWorked,
+        status,
+        createdAt,
+        updatedAt,
+        latitude,
+        longitude,
+        checkInTime,
+        checkOutTime,
+        photoUrl,
+        supervisorComment,
+        approvedAt
+      ]);
 
   @JsonKey(ignore: true)
   @override
@@ -391,18 +498,23 @@ class _$LogbookEntryModelImpl implements _LogbookEntryModel {
 
 abstract class _LogbookEntryModel implements LogbookEntryModel {
   const factory _LogbookEntryModel(
-      {final String? studentRefPath,
-      final String? placementRefPath,
+      {final String? id,
+      required final String studentRefPath,
+      required final String placementRefPath,
       required final DateTime date,
       required final int dayNumber,
-      required final String tasks,
+      required final String tasksPerformed,
+      final String? challenges,
+      final String? skillsLearned,
       required final double hoursWorked,
+      final String status,
+      final DateTime? createdAt,
+      final DateTime? updatedAt,
       final double? latitude,
       final double? longitude,
       final DateTime? checkInTime,
       final DateTime? checkOutTime,
       final String? photoUrl,
-      final String? status,
       final String? supervisorComment,
       final DateTime? approvedAt}) = _$LogbookEntryModelImpl;
 
@@ -410,30 +522,40 @@ abstract class _LogbookEntryModel implements LogbookEntryModel {
       _$LogbookEntryModelImpl.fromJson;
 
   @override
-  String? get studentRefPath;
+  String? get id;
+  @override // document ID - useful when editing
+  String get studentRefPath;
   @override
-  String? get placementRefPath;
+  String get placementRefPath;
   @override
   DateTime get date;
   @override
   int get dayNumber;
   @override
-  String get tasks;
+  String get tasksPerformed;
+  @override // renamed for better readability
+  String? get challenges;
+  @override
+  String? get skillsLearned;
   @override
   double get hoursWorked;
   @override
+  String get status;
+  @override // draft → submitted → pending → approved/rejected
+  DateTime? get createdAt;
+  @override
+  DateTime? get updatedAt;
+  @override // GPS / check-in/out fields (for phase 2)
   double? get latitude;
-  @override // Store GeoPoint as separate coordinates
+  @override
   double? get longitude;
   @override
   DateTime? get checkInTime;
   @override
   DateTime? get checkOutTime;
-  @override
+  @override // Supervisor feedback fields
   String? get photoUrl;
-  @override
-  String? get status;
-  @override
+  @override // optional proof photo
   String? get supervisorComment;
   @override
   DateTime? get approvedAt;

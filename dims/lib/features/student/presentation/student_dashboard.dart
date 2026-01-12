@@ -7,6 +7,9 @@ import 'package:dims/features/student/presentation/pages/logbook_page.dart';
 import 'package:dims/features/student/presentation/pages/my_internship_page.dart';
 import 'package:dims/features/student/presentation/pages/student_profile_page.dart';
 
+// New import for the form screen
+import '../../logbook/presentation/screens/logbook_entry_form_screen.dart';
+
 // Selected tab state
 final selectedStudentTabProvider = StateProvider<int>((ref) => 0);
 
@@ -19,12 +22,10 @@ class StudentDashboard extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width >= 800;
-    
-    // Get student from async value
-    final student = authState.whenOrNull(
-      data: (user) => user,
-    );
-    
+
+    // Get current user for avatar
+    final user = authState.whenOrNull(data: (user) => user);
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -57,21 +58,19 @@ class StudentDashboard extends ConsumerWidget {
           ],
         ),
         actions: [
-          // Notifications icon
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
-              // TODO: Navigate to notifications
+              // TODO: Notifications screen
             },
             tooltip: 'Notifications',
           ),
-          // Profile menu
           PopupMenuButton<String>(
             icon: CircleAvatar(
               radius: 16,
               backgroundColor: theme.colorScheme.primaryContainer,
               child: Text(
-                (student?.email ?? 'S')[0].toUpperCase(),
+                (user?.email ?? 'S')[0].toUpperCase(),
                 style: TextStyle(
                   color: theme.colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.bold,
@@ -84,7 +83,7 @@ class StudentDashboard extends ConsumerWidget {
                   ref.read(selectedStudentTabProvider.notifier).state = 3;
                   break;
                 case 'settings':
-                  // TODO: Navigate to settings
+                  // TODO: Settings
                   break;
                 case 'logout':
                   ref.read(authControllerProvider).signOut();
@@ -92,7 +91,7 @@ class StudentDashboard extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
+              const PopupMenuItem(
                 value: 'profile',
                 child: ListTile(
                   leading: Icon(Icons.person),
@@ -100,7 +99,7 @@ class StudentDashboard extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              const PopupMenuItem<String>(
+              const PopupMenuItem(
                 value: 'settings',
                 child: ListTile(
                   leading: Icon(Icons.settings),
@@ -109,7 +108,7 @@ class StudentDashboard extends ConsumerWidget {
                 ),
               ),
               const PopupMenuDivider(),
-              const PopupMenuItem<String>(
+              const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
                   leading: Icon(Icons.logout),
@@ -122,6 +121,8 @@ class StudentDashboard extends ConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
+
+      // ── BODY ────────────────────────────────────────────────────────────────
       body: isDesktop
           ? Row(
               children: [
@@ -159,6 +160,25 @@ class StudentDashboard extends ConsumerWidget {
               ],
             )
           : _getSelectedPage(selectedTab),
+
+      // ── FAB ─────────────────────────────────────────────────────────────────
+      floatingActionButton: selectedTab == 1 // Only show on Logbook tab
+          ? FloatingActionButton.extended(
+              heroTag: 'add_logbook_entry',
+              icon: const Icon(Icons.add),
+              label: const Text('New Entry'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const LogbookEntryFormScreen(),
+                  ),
+                );
+              },
+            )
+          : null,
+
+      // ── BOTTOM NAV ──────────────────────────────────────────────────────────
       bottomNavigationBar: !isDesktop
           ? NavigationBar(
               selectedIndex: selectedTab,

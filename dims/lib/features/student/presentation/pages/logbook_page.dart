@@ -1,9 +1,12 @@
-// lib/features/student/presentation/pages/logbook_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dims/features/student/controllers/student_controllers.dart';
-import 'package:dims/features/logbook/data/models/logbook_entry_model.dart';
+import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart'; // ← Added for context.go / context.push
 
+import '../../controllers/student_controllers.dart';
+import '../../../logbook/data/models/logbook_entry_model.dart';
+import '../../../logbook/presentation/screens/logbook_entry_details_screen.dart';
+import 'package:dims/features/logbook/presentation/screens/logbook_entry_form_screen.dart';
 class LogbookPage extends ConsumerWidget {
   const LogbookPage({super.key});
 
@@ -37,13 +40,11 @@ class LogbookPage extends ConsumerWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   FilledButton.icon(
                     onPressed: () {
-                      // TODO: Navigate to add entry
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Add entry feature coming soon')),
-                      );
+                      // Navigate to new entry form using go_router
+                      context.push('/logbook/add');
                     },
                     icon: const Icon(Icons.add),
                     label: const Text('Add First Entry'),
@@ -61,19 +62,25 @@ class LogbookPage extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               itemCount: entries.length,
               itemBuilder: (context, index) {
-                final docId = entries[index]['id'] as String;
-                final entry = entries[index]['entry'] as LogbookEntryModel;
-                
+                final entryMap = entries[index];
+                final docId = entryMap['id'] as String;
+                final entry = entryMap['entry'] as LogbookEntryModel;
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     leading: CircleAvatar(
                       backgroundColor: _getStatusColor(entry.status),
+                      radius: 28,
                       child: Text(
                         '${entry.dayNumber}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
                     ),
@@ -85,7 +92,10 @@ class LogbookPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${_formatDate(entry.date)} • ${entry.status ?? "pending"}',
+                          '${_formatDate(entry.date)} • ${entry.status?.toUpperCase() ?? "Pending"}',
+                          style: TextStyle(
+                            color: _getStatusTextColor(entry.status),
+                          ),
                         ),
                         Text(
                           '${entry.hoursWorked.toStringAsFixed(1)} hours',
@@ -95,16 +105,9 @@ class LogbookPage extends ConsumerWidget {
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.more_vert),
-                      onPressed: () {
-                        _showOptionsMenu(context, ref, docId, entry);
-                      },
+                      onPressed: () => _showOptionsMenu(context, ref, docId, entry),
                     ),
-                    onTap: () {
-                      // TODO: Navigate to entry details
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('View details for Day ${entry.dayNumber}')),
-                      );
-                    },
+                    onTap: () => _navigateToDetails(context, entry),
                   ),
                 );
               },
@@ -118,8 +121,8 @@ class LogbookPage extends ConsumerWidget {
             children: [
               const Icon(Icons.error_outline, size: 48, color: Colors.red),
               const SizedBox(height: 16),
-              Text('Error: $error'),
-              const SizedBox(height: 16),
+              Text('Error loading entries: $error'),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => ref.invalidate(logbookEntriesProvider),
                 child: const Text('Retry'),
@@ -129,11 +132,9 @@ class LogbookPage extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'add_logbook_entry',
         onPressed: () {
-          // TODO: Navigate to add entry
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add entry feature coming soon')),
-          );
+          context.push('/logbook/add'); // New entry route
         },
         icon: const Icon(Icons.add),
         label: const Text('New Entry'),
@@ -141,80 +142,99 @@ class LogbookPage extends ConsumerWidget {
     );
   }
 
-  void _showOptionsMenu(
-    BuildContext context, 
-    WidgetRef ref, 
-    String docId, 
-    LogbookEntryModel entry,
-  ) {
+  // ── Navigation Helpers ─────────────────────────────────────────────────────
+
+  void _navigateToDetails(BuildContext context, LogbookEntryModel entry) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LogbookEntryDetailsScreen(entry: entry),
+      ),
+    );
+  }
+
+  void _showOptionsMenu(BuildContext context, WidgetRef ref, String docId, LogbookEntryModel entry) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (entry.status?.toLowerCase() != 'approved')
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Edit'),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Edit feature coming soon')),
-                  );
-                },
-              ),
+            // View Details
             ListTile(
-              leading: const Icon(Icons.visibility),
+              leading: Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary),
               title: const Text('View Details'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('View details feature coming soon')),
-                );
+                _navigateToDetails(context, entry);
               },
             ),
-            if (entry.status?.toLowerCase() != 'approved')
+
+            // Edit (only for draft/pending)
+            if (entry.status?.toLowerCase() == 'draft' || entry.status?.toLowerCase() == 'pending')
+              ListTile(
+                leading: Icon(Icons.edit, color: Theme.of(context).colorScheme.secondary),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(context);
+                  // FIXED: Navigate to edit form with existing entry
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LogbookEntryFormScreen(existingEntry: entry),
+                    ),
+                  );
+                },
+              ),
+
+            // Delete (only for draft/pending)
+            if (entry.status?.toLowerCase() == 'draft' || entry.status?.toLowerCase() == 'pending')
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
                 title: const Text('Delete', style: TextStyle(color: Colors.red)),
                 onTap: () async {
                   Navigator.pop(context);
+
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Delete Entry'),
-                      content: const Text('Are you sure you want to delete this entry?'),
+                      content: const Text(
+                        'Are you sure you want to delete this logbook entry?\nThis action cannot be undone.',
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
                           child: const Text('Cancel'),
                         ),
                         TextButton(
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          child: const Text('Delete'),
                         ),
                       ],
                     ),
                   );
-                  
+
                   if (confirm == true && context.mounted) {
                     try {
                       await ref.read(logbookControllerProvider).deleteEntry(
-                        docId,
-                        entry.status,
+                            docId,
+                            entry.status,
+                          );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Entry deleted successfully'),
+                          backgroundColor: Colors.green,
+                        ),
                       );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Entry deleted')),
-                        );
-                      }
                     } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e')),
-                        );
-                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error deleting entry: $e')),
+                      );
                     }
                   }
                 },
@@ -224,6 +244,8 @@ class LogbookPage extends ConsumerWidget {
       ),
     );
   }
+
+  // ── Helper Methods ─────────────────────────────────────────────────────────
 
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
@@ -236,7 +258,18 @@ class LogbookPage extends ConsumerWidget {
     }
   }
 
+  Color _getStatusTextColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return Colors.green.shade800;
+      case 'rejected':
+        return Colors.red.shade800;
+      default:
+        return Colors.orange.shade800;
+    }
+  }
+
   String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    return DateFormat('MMM d, yyyy').format(date);
   }
 }

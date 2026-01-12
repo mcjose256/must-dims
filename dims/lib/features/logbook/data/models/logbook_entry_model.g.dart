@@ -9,12 +9,22 @@ part of 'logbook_entry_model.dart';
 _$LogbookEntryModelImpl _$$LogbookEntryModelImplFromJson(
         Map<String, dynamic> json) =>
     _$LogbookEntryModelImpl(
-      studentRefPath: json['studentRefPath'] as String?,
-      placementRefPath: json['placementRefPath'] as String?,
+      id: json['id'] as String?,
+      studentRefPath: json['studentRefPath'] as String,
+      placementRefPath: json['placementRefPath'] as String,
       date: DateTime.parse(json['date'] as String),
       dayNumber: (json['dayNumber'] as num).toInt(),
-      tasks: json['tasks'] as String,
+      tasksPerformed: json['tasksPerformed'] as String,
+      challenges: json['challenges'] as String?,
+      skillsLearned: json['skillsLearned'] as String?,
       hoursWorked: (json['hoursWorked'] as num).toDouble(),
+      status: json['status'] as String? ?? 'draft',
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.parse(json['createdAt'] as String),
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       checkInTime: json['checkInTime'] == null
@@ -24,7 +34,6 @@ _$LogbookEntryModelImpl _$$LogbookEntryModelImplFromJson(
           ? null
           : DateTime.parse(json['checkOutTime'] as String),
       photoUrl: json['photoUrl'] as String?,
-      status: json['status'] as String?,
       supervisorComment: json['supervisorComment'] as String?,
       approvedAt: json['approvedAt'] == null
           ? null
@@ -34,18 +43,23 @@ _$LogbookEntryModelImpl _$$LogbookEntryModelImplFromJson(
 Map<String, dynamic> _$$LogbookEntryModelImplToJson(
         _$LogbookEntryModelImpl instance) =>
     <String, dynamic>{
+      'id': instance.id,
       'studentRefPath': instance.studentRefPath,
       'placementRefPath': instance.placementRefPath,
       'date': instance.date.toIso8601String(),
       'dayNumber': instance.dayNumber,
-      'tasks': instance.tasks,
+      'tasksPerformed': instance.tasksPerformed,
+      'challenges': instance.challenges,
+      'skillsLearned': instance.skillsLearned,
       'hoursWorked': instance.hoursWorked,
+      'status': instance.status,
+      'createdAt': instance.createdAt?.toIso8601String(),
+      'updatedAt': instance.updatedAt?.toIso8601String(),
       'latitude': instance.latitude,
       'longitude': instance.longitude,
       'checkInTime': instance.checkInTime?.toIso8601String(),
       'checkOutTime': instance.checkOutTime?.toIso8601String(),
       'photoUrl': instance.photoUrl,
-      'status': instance.status,
       'supervisorComment': instance.supervisorComment,
       'approvedAt': instance.approvedAt?.toIso8601String(),
     };

@@ -1,10 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Feature Imports
 import 'package:dims/features/auth/controllers/auth_controller.dart';
 import 'package:dims/features/auth/data/models/user_model.dart';
 import 'package:dims/features/splash/splash_page.dart';
@@ -16,10 +14,10 @@ import 'package:dims/features/student/presentation/student_dashboard.dart';
 // import 'package:dims/features/supervisor/presentation/supervisor_dashboard.dart';
 import 'package:dims/features/admin/presentation/admin_dashboard.dart';
 
-// Provider for the profile check to keep logic clean
+// Helper provider to check if student profile exists
 final profileCheckProvider = FutureProvider.family<bool, String>((ref, uid) async {
   final doc = await FirebaseFirestore.instance
-      .collection('students')  // Changed from 'student_profiles' to 'students'
+      .collection('students')
       .doc(uid)
       .get();
   return doc.exists;
@@ -30,70 +28,74 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: RouterNotifier(ref),
     redirect: (BuildContext context, GoRouterState state) async {
-      // 1. ALWAYS read the state fresh inside the redirect
-      final authState = ref.read(authStateProvider);
       final path = state.uri.path;
-      
-      final publicRoutes = ['/', '/login', '/register'];
-      final isPublicRoute = publicRoutes.contains(path);
 
-      // DEBUG LOGS - Check your terminal/debug console!
+      // Read auth state (StreamProvider) → no .notifier needed
+      final authState = ref.read(authStateProvider);
+      final user = authState.value;
+
+      // Debug logs (keep for now — very helpful!)
       print('--- ROUTER REDIRECT ---');
       print('Current Path: $path');
       print('Auth Loading: ${authState.isLoading}');
-      
-      if (authState.isLoading) return null;
-
-      final user = authState.value;
       print('User logged in: ${user != null}');
       if (user != null) {
         print('User Role: ${user.role}');
         print('User Approved: ${user.isApproved}');
       }
 
-      // 1. No user logged in
+      // 1. Still loading auth → stay where you are
+      if (authState.isLoading) {
+        return null;
+      }
+
+      // 2. Not logged in → force to login (unless already there)
       if (user == null) {
+        final isPublicRoute = ['/', '/login', '/register'].contains(path);
         return isPublicRoute ? null : '/login';
       }
 
-      // 2. User is logged in, handle Approval
+      // 3. Not approved → go to pending approval
       if (!user.isApproved) {
-        print('Redirecting to pending approval...');
         return path == '/pending-approval' ? null : '/pending-approval';
       }
 
-      // 3. Role-based Navigation
+      // 4. Role-based protected routes
       switch (user.role) {
-        case UserRole.admin:
-          if (isPublicRoute || path == '/pending-approval') {
-            print('Admin detected, redirecting to dashboard...');
-            return '/admin/dashboard';
-          }
-          return null;
-
         case UserRole.student:
+          // Check profile existence (only once per redirect)
           final hasProfile = await ref.read(profileCheckProvider(user.uid).future);
           print('Student has profile: $hasProfile');
+
+          // No profile → force to complete-profile
           if (!hasProfile) {
-            print('No profile, redirecting to complete-profile...');
             return path == '/complete-profile' ? null : '/complete-profile';
           }
-          if (isPublicRoute || path == '/pending-approval' || path == '/complete-profile') {
-            print('Profile complete, redirecting to student dashboard...');
-            return '/student/dashboard';
+
+          // Already completed → allow student routes, redirect only if outside
+          if (path.startsWith('/student/')) {
+            return null; // ← CRITICAL: prevents redirect loop!
           }
-          return null;
+
+          print('Profile complete → redirecting to student dashboard');
+          return '/student/dashboard';
 
         case UserRole.supervisor:
-          if (isPublicRoute || path == '/pending-approval') {
-            // return '/supervisor/dashboard';
-            // Temporarily redirect to a placeholder until supervisor dashboard is ready
-            return '/login'; // Remove this line when supervisor dashboard is ready
+          // Temporarily redirect to login until supervisor dashboard is ready
+          // When ready: replace with '/supervisor/dashboard'
+          if (path.startsWith('/supervisor/')) {
+            return null;
           }
-          return null;
-          
+          return '/login'; // ← change this later
+
+        case UserRole.admin:
+          if (path.startsWith('/admin/')) {
+            return null;
+          }
+          return '/admin/dashboard';
+
         default:
-          return null;
+          return '/login';
       }
     },
     routes: [
@@ -117,11 +119,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/complete-profile',
         builder: (context, state) => const CompleteProfilePage(),
       ),
+      // Student protected route
       GoRoute(
         path: '/student/dashboard',
         builder: (context, state) => const StudentDashboard(),
       ),
-      // Uncomment when supervisor dashboard is ready
+      // Supervisor (placeholder until ready)
       // GoRoute(
       //   path: '/supervisor/dashboard',
       //   builder: (context, state) => const SupervisorDashboard(),
@@ -134,13 +137,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// A cleaner way to handle GoRouter refreshes with Riverpod
+/// Listens to auth changes and triggers router refresh
 class RouterNotifier extends ChangeNotifier {
-  final Ref _ref;
-  
-  RouterNotifier(this._ref) {
-    // Listen to the auth state. Whenever it changes from Loading to Data, 
-    // or from User to Null, notify GoRouter to re-run the redirect logic.
-    _ref.listen(authStateProvider, (_, __) => notifyListeners());
+  final Ref ref;
+
+  RouterNotifier(this.ref) {
+    ref.listen(authStateProvider, (_, __) {
+      notifyListeners();
+    });
   }
 }
