@@ -20,11 +20,14 @@ EvaluationModel _$EvaluationModelFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$EvaluationModel {
-  String? get placementRefPath => throw _privateConstructorUsedError;
-  String? get evaluatorRefPath => throw _privateConstructorUsedError;
-  Map<String, int> get scores => throw _privateConstructorUsedError;
+  String? get id => throw _privateConstructorUsedError;
+  String get studentId => throw _privateConstructorUsedError;
+  String get supervisorId => throw _privateConstructorUsedError;
+  double get performanceScore => throw _privateConstructorUsedError;
+  double get attendanceScore => throw _privateConstructorUsedError;
+  double get communicationScore => throw _privateConstructorUsedError;
   String get comments => throw _privateConstructorUsedError;
-  DateTime? get submittedAt => throw _privateConstructorUsedError;
+  DateTime? get createdAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -39,11 +42,14 @@ abstract class $EvaluationModelCopyWith<$Res> {
       _$EvaluationModelCopyWithImpl<$Res, EvaluationModel>;
   @useResult
   $Res call(
-      {String? placementRefPath,
-      String? evaluatorRefPath,
-      Map<String, int> scores,
+      {String? id,
+      String studentId,
+      String supervisorId,
+      double performanceScore,
+      double attendanceScore,
+      double communicationScore,
       String comments,
-      DateTime? submittedAt});
+      DateTime? createdAt});
 }
 
 /// @nodoc
@@ -59,32 +65,47 @@ class _$EvaluationModelCopyWithImpl<$Res, $Val extends EvaluationModel>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? placementRefPath = freezed,
-    Object? evaluatorRefPath = freezed,
-    Object? scores = null,
+    Object? id = freezed,
+    Object? studentId = null,
+    Object? supervisorId = null,
+    Object? performanceScore = null,
+    Object? attendanceScore = null,
+    Object? communicationScore = null,
     Object? comments = null,
-    Object? submittedAt = freezed,
+    Object? createdAt = freezed,
   }) {
     return _then(_value.copyWith(
-      placementRefPath: freezed == placementRefPath
-          ? _value.placementRefPath
-          : placementRefPath // ignore: cast_nullable_to_non_nullable
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
               as String?,
-      evaluatorRefPath: freezed == evaluatorRefPath
-          ? _value.evaluatorRefPath
-          : evaluatorRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
-      scores: null == scores
-          ? _value.scores
-          : scores // ignore: cast_nullable_to_non_nullable
-              as Map<String, int>,
+      studentId: null == studentId
+          ? _value.studentId
+          : studentId // ignore: cast_nullable_to_non_nullable
+              as String,
+      supervisorId: null == supervisorId
+          ? _value.supervisorId
+          : supervisorId // ignore: cast_nullable_to_non_nullable
+              as String,
+      performanceScore: null == performanceScore
+          ? _value.performanceScore
+          : performanceScore // ignore: cast_nullable_to_non_nullable
+              as double,
+      attendanceScore: null == attendanceScore
+          ? _value.attendanceScore
+          : attendanceScore // ignore: cast_nullable_to_non_nullable
+              as double,
+      communicationScore: null == communicationScore
+          ? _value.communicationScore
+          : communicationScore // ignore: cast_nullable_to_non_nullable
+              as double,
       comments: null == comments
           ? _value.comments
           : comments // ignore: cast_nullable_to_non_nullable
               as String,
-      submittedAt: freezed == submittedAt
-          ? _value.submittedAt
-          : submittedAt // ignore: cast_nullable_to_non_nullable
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
     ) as $Val);
   }
@@ -99,11 +120,14 @@ abstract class _$$EvaluationModelImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String? placementRefPath,
-      String? evaluatorRefPath,
-      Map<String, int> scores,
+      {String? id,
+      String studentId,
+      String supervisorId,
+      double performanceScore,
+      double attendanceScore,
+      double communicationScore,
       String comments,
-      DateTime? submittedAt});
+      DateTime? createdAt});
 }
 
 /// @nodoc
@@ -117,32 +141,47 @@ class __$$EvaluationModelImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? placementRefPath = freezed,
-    Object? evaluatorRefPath = freezed,
-    Object? scores = null,
+    Object? id = freezed,
+    Object? studentId = null,
+    Object? supervisorId = null,
+    Object? performanceScore = null,
+    Object? attendanceScore = null,
+    Object? communicationScore = null,
     Object? comments = null,
-    Object? submittedAt = freezed,
+    Object? createdAt = freezed,
   }) {
     return _then(_$EvaluationModelImpl(
-      placementRefPath: freezed == placementRefPath
-          ? _value.placementRefPath
-          : placementRefPath // ignore: cast_nullable_to_non_nullable
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
               as String?,
-      evaluatorRefPath: freezed == evaluatorRefPath
-          ? _value.evaluatorRefPath
-          : evaluatorRefPath // ignore: cast_nullable_to_non_nullable
-              as String?,
-      scores: null == scores
-          ? _value._scores
-          : scores // ignore: cast_nullable_to_non_nullable
-              as Map<String, int>,
+      studentId: null == studentId
+          ? _value.studentId
+          : studentId // ignore: cast_nullable_to_non_nullable
+              as String,
+      supervisorId: null == supervisorId
+          ? _value.supervisorId
+          : supervisorId // ignore: cast_nullable_to_non_nullable
+              as String,
+      performanceScore: null == performanceScore
+          ? _value.performanceScore
+          : performanceScore // ignore: cast_nullable_to_non_nullable
+              as double,
+      attendanceScore: null == attendanceScore
+          ? _value.attendanceScore
+          : attendanceScore // ignore: cast_nullable_to_non_nullable
+              as double,
+      communicationScore: null == communicationScore
+          ? _value.communicationScore
+          : communicationScore // ignore: cast_nullable_to_non_nullable
+              as double,
       comments: null == comments
           ? _value.comments
           : comments // ignore: cast_nullable_to_non_nullable
               as String,
-      submittedAt: freezed == submittedAt
-          ? _value.submittedAt
-          : submittedAt // ignore: cast_nullable_to_non_nullable
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
     ));
   }
@@ -152,36 +191,38 @@ class __$$EvaluationModelImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$EvaluationModelImpl implements _EvaluationModel {
   const _$EvaluationModelImpl(
-      {this.placementRefPath,
-      this.evaluatorRefPath,
-      required final Map<String, int> scores,
+      {this.id,
+      required this.studentId,
+      required this.supervisorId,
+      required this.performanceScore,
+      required this.attendanceScore,
+      required this.communicationScore,
       required this.comments,
-      this.submittedAt})
-      : _scores = scores;
+      this.createdAt});
 
   factory _$EvaluationModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$EvaluationModelImplFromJson(json);
 
   @override
-  final String? placementRefPath;
+  final String? id;
   @override
-  final String? evaluatorRefPath;
-  final Map<String, int> _scores;
+  final String studentId;
   @override
-  Map<String, int> get scores {
-    if (_scores is EqualUnmodifiableMapView) return _scores;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(_scores);
-  }
-
+  final String supervisorId;
+  @override
+  final double performanceScore;
+  @override
+  final double attendanceScore;
+  @override
+  final double communicationScore;
   @override
   final String comments;
   @override
-  final DateTime? submittedAt;
+  final DateTime? createdAt;
 
   @override
   String toString() {
-    return 'EvaluationModel(placementRefPath: $placementRefPath, evaluatorRefPath: $evaluatorRefPath, scores: $scores, comments: $comments, submittedAt: $submittedAt)';
+    return 'EvaluationModel(id: $id, studentId: $studentId, supervisorId: $supervisorId, performanceScore: $performanceScore, attendanceScore: $attendanceScore, communicationScore: $communicationScore, comments: $comments, createdAt: $createdAt)';
   }
 
   @override
@@ -189,26 +230,35 @@ class _$EvaluationModelImpl implements _EvaluationModel {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$EvaluationModelImpl &&
-            (identical(other.placementRefPath, placementRefPath) ||
-                other.placementRefPath == placementRefPath) &&
-            (identical(other.evaluatorRefPath, evaluatorRefPath) ||
-                other.evaluatorRefPath == evaluatorRefPath) &&
-            const DeepCollectionEquality().equals(other._scores, _scores) &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.studentId, studentId) ||
+                other.studentId == studentId) &&
+            (identical(other.supervisorId, supervisorId) ||
+                other.supervisorId == supervisorId) &&
+            (identical(other.performanceScore, performanceScore) ||
+                other.performanceScore == performanceScore) &&
+            (identical(other.attendanceScore, attendanceScore) ||
+                other.attendanceScore == attendanceScore) &&
+            (identical(other.communicationScore, communicationScore) ||
+                other.communicationScore == communicationScore) &&
             (identical(other.comments, comments) ||
                 other.comments == comments) &&
-            (identical(other.submittedAt, submittedAt) ||
-                other.submittedAt == submittedAt));
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt));
   }
 
   @JsonKey(ignore: true)
   @override
   int get hashCode => Object.hash(
       runtimeType,
-      placementRefPath,
-      evaluatorRefPath,
-      const DeepCollectionEquality().hash(_scores),
+      id,
+      studentId,
+      supervisorId,
+      performanceScore,
+      attendanceScore,
+      communicationScore,
       comments,
-      submittedAt);
+      createdAt);
 
   @JsonKey(ignore: true)
   @override
@@ -227,25 +277,34 @@ class _$EvaluationModelImpl implements _EvaluationModel {
 
 abstract class _EvaluationModel implements EvaluationModel {
   const factory _EvaluationModel(
-      {final String? placementRefPath,
-      final String? evaluatorRefPath,
-      required final Map<String, int> scores,
+      {final String? id,
+      required final String studentId,
+      required final String supervisorId,
+      required final double performanceScore,
+      required final double attendanceScore,
+      required final double communicationScore,
       required final String comments,
-      final DateTime? submittedAt}) = _$EvaluationModelImpl;
+      final DateTime? createdAt}) = _$EvaluationModelImpl;
 
   factory _EvaluationModel.fromJson(Map<String, dynamic> json) =
       _$EvaluationModelImpl.fromJson;
 
   @override
-  String? get placementRefPath;
+  String? get id;
   @override
-  String? get evaluatorRefPath;
+  String get studentId;
   @override
-  Map<String, int> get scores;
+  String get supervisorId;
+  @override
+  double get performanceScore;
+  @override
+  double get attendanceScore;
+  @override
+  double get communicationScore;
   @override
   String get comments;
   @override
-  DateTime? get submittedAt;
+  DateTime? get createdAt;
   @override
   @JsonKey(ignore: true)
   _$$EvaluationModelImplCopyWith<_$EvaluationModelImpl> get copyWith =>

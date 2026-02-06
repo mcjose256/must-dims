@@ -20,8 +20,7 @@ StudentProfileModel _$StudentProfileModelFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$StudentProfileModel {
-  String get uid =>
-      throw _privateConstructorUsedError; // ✅ Include UID as a regular field
+  String get uid => throw _privateConstructorUsedError;
   String get registrationNumber => throw _privateConstructorUsedError;
   String get program => throw _privateConstructorUsedError;
   int get yearOfStudy => throw _privateConstructorUsedError;
@@ -178,7 +177,6 @@ class _$StudentProfileModelImpl implements _StudentProfileModel {
 
   @override
   final String uid;
-// ✅ Include UID as a regular field
   @override
   final String registrationNumber;
   @override
@@ -245,7 +243,7 @@ abstract class _StudentProfileModel implements StudentProfileModel {
 
   @override
   String get uid;
-  @override // ✅ Include UID as a regular field
+  @override
   String get registrationNumber;
   @override
   String get program;

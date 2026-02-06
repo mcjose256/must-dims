@@ -1,8 +1,8 @@
-// lib/features/student/presentation/pages/student_profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dims/features/student/controllers/student_controllers.dart';
 import 'package:dims/features/auth/controllers/auth_controller.dart';
+import 'package:dims/features/student/data/models/student_profile_model.dart'; // Ensure this is imported
 
 class StudentProfilePage extends ConsumerWidget {
   const StudentProfilePage({super.key});
@@ -20,7 +20,7 @@ class StudentProfilePage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              // TODO: Navigate to edit profile
+              // TODO: Navigate to edit profile page
             },
           ),
         ],
@@ -30,10 +30,11 @@ class StudentProfilePage extends ConsumerWidget {
           ref.invalidate(studentProfileProvider);
         },
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Profile header
+              // Profile Header Section
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -60,7 +61,7 @@ class StudentProfilePage extends ConsumerWidget {
                         data: (user) => Column(
                           children: [
                             Text(
-                              user?.displayName ?? 'Student',
+                              user?.displayName ?? 'Student User',
                               style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -75,7 +76,7 @@ class StudentProfilePage extends ConsumerWidget {
                           ],
                         ),
                         loading: () => const CircularProgressIndicator(),
-                        error: (_, __) => const Text('Error loading user'),
+                        error: (_, __) => const Text('Error loading user info'),
                       ),
                     ],
                   ),
@@ -83,43 +84,16 @@ class StudentProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Academic information
+              // Academic & Internship Information
               profileAsync.when(
                 data: (profile) {
                   if (profile == null) {
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.warning_outlined,
-                              size: 48,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text('Profile not set up'),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Complete your profile to get started',
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            FilledButton(
-                              onPressed: () {
-                                // TODO: Navigate to profile setup
-                              },
-                              child: const Text('Set Up Profile'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return _buildNoProfileCard(context);
                   }
 
                   return Column(
                     children: [
-                      // Academic info card
+                      // Academic Info Card
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(20),
@@ -162,7 +136,7 @@ class StudentProfilePage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // Internship status card
+                      // Internship Status Card
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(20),
@@ -214,32 +188,12 @@ class StudentProfilePage extends ConsumerWidget {
                     child: CircularProgressIndicator(),
                   ),
                 ),
-                error: (error, stack) => Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(height: 16),
-                        Text('Error: $error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => ref.invalidate(studentProfileProvider),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                error: (error, stack) => _buildErrorCard(context, ref, error),
               ),
 
               const SizedBox(height: 24),
 
-              // Logout button
+              // Logout Button
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -251,9 +205,11 @@ class StudentProfilePage extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
                     side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -261,17 +217,58 @@ class StudentProfilePage extends ConsumerWidget {
     );
   }
 
-  IconData _getStatusIcon(dynamic status) {
-    final statusStr = status.toString().split('.').last;
-    switch (statusStr) {
-      case 'inProgress':
+  Widget _buildNoProfileCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Icon(Icons.warning_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            const Text('Profile not set up'),
+            const SizedBox(height: 8),
+            const Text('Please complete your profile details.', textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(BuildContext context, WidgetRef ref, Object error) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(studentProfileProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getStatusIcon(StudentInternshipStatus status) {
+    switch (status) {
+      case StudentInternshipStatus.inProgress:
         return Icons.play_circle;
-      case 'completed':
+      case StudentInternshipStatus.completed:
         return Icons.check_circle;
-      case 'notStarted':
+      case StudentInternshipStatus.notStarted:
         return Icons.pending;
-      default:
-        return Icons.info;
+      case StudentInternshipStatus.awaitingApproval:
+        return Icons.hourglass_empty;
+      case StudentInternshipStatus.deferred:
+        return Icons.pause_circle;
+      case StudentInternshipStatus.terminated:
+        return Icons.cancel;
     }
   }
 }
@@ -289,9 +286,10 @@ class _ProfileInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -299,8 +297,8 @@ class _ProfileInfoRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),

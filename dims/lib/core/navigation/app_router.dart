@@ -11,7 +11,7 @@ import 'package:dims/features/auth/presentation/register_page.dart';
 import 'package:dims/features/auth/presentation/pending_approval_page.dart';
 import 'package:dims/features/student/presentation/pages/complete_profile_page.dart';
 import 'package:dims/features/student/presentation/student_dashboard.dart';
-// import 'package:dims/features/supervisor/presentation/supervisor_dashboard.dart';
+import 'package:dims/features/supervisor/presentation/screens/supervisor_dashboard.dart';
 import 'package:dims/features/admin/presentation/admin_dashboard.dart';
 
 // Helper provider to check if student profile exists
@@ -81,12 +81,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return '/student/dashboard';
 
         case UserRole.supervisor:
-          // Temporarily redirect to login until supervisor dashboard is ready
-          // When ready: replace with '/supervisor/dashboard'
-          if (path.startsWith('/supervisor/')) {
-            return null;
-          }
-          return '/login'; // ← change this later
+  // Allow supervisor routes
+  if (path == '/supervisor/dashboard' || path.startsWith('/supervisor/')) {
+    print('Supervisor already in dashboard area → stay');
+    return null;
+  }
+  print('Supervisor redirecting to dashboard');
+  return '/supervisor/dashboard';
 
         case UserRole.admin:
           if (path.startsWith('/admin/')) {
@@ -124,11 +125,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/student/dashboard',
         builder: (context, state) => const StudentDashboard(),
       ),
-      // Supervisor (placeholder until ready)
-      // GoRoute(
-      //   path: '/supervisor/dashboard',
-      //   builder: (context, state) => const SupervisorDashboard(),
-      // ),
+     GoRoute(
+  path: '/supervisor/dashboard',
+  builder: (context, state) => const SupervisorDashboard(),
+),
       GoRoute(
         path: '/admin/dashboard',
         builder: (context, state) => const AdminDashboard(),

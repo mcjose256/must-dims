@@ -43,6 +43,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
 
       final profile = StudentProfileModel(
         registrationNumber: _registrationNumberController.text.trim(),
+         uid: authState.uid,
         program: _programController.text.trim(),
         academicYear: int.parse(_academicYearController.text.trim()),
         currentLevel: _currentLevelController.text.trim(),

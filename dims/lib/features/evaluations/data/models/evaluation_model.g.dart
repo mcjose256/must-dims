@@ -9,21 +9,27 @@ part of 'evaluation_model.dart';
 _$EvaluationModelImpl _$$EvaluationModelImplFromJson(
         Map<String, dynamic> json) =>
     _$EvaluationModelImpl(
-      placementRefPath: json['placementRefPath'] as String?,
-      evaluatorRefPath: json['evaluatorRefPath'] as String?,
-      scores: Map<String, int>.from(json['scores'] as Map),
+      id: json['id'] as String?,
+      studentId: json['studentId'] as String,
+      supervisorId: json['supervisorId'] as String,
+      performanceScore: (json['performanceScore'] as num).toDouble(),
+      attendanceScore: (json['attendanceScore'] as num).toDouble(),
+      communicationScore: (json['communicationScore'] as num).toDouble(),
       comments: json['comments'] as String,
-      submittedAt: json['submittedAt'] == null
+      createdAt: json['createdAt'] == null
           ? null
-          : DateTime.parse(json['submittedAt'] as String),
+          : DateTime.parse(json['createdAt'] as String),
     );
 
 Map<String, dynamic> _$$EvaluationModelImplToJson(
         _$EvaluationModelImpl instance) =>
     <String, dynamic>{
-      'placementRefPath': instance.placementRefPath,
-      'evaluatorRefPath': instance.evaluatorRefPath,
-      'scores': instance.scores,
+      'id': instance.id,
+      'studentId': instance.studentId,
+      'supervisorId': instance.supervisorId,
+      'performanceScore': instance.performanceScore,
+      'attendanceScore': instance.attendanceScore,
+      'communicationScore': instance.communicationScore,
       'comments': instance.comments,
-      'submittedAt': instance.submittedAt?.toIso8601String(),
+      'createdAt': instance.createdAt?.toIso8601String(),
     };

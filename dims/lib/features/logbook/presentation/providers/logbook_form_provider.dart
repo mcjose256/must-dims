@@ -118,10 +118,17 @@ class LogbookFormNotifier extends StateNotifier<LogbookFormState> {
     state = state.copyWith(hoursWorked: value.clamp(0.0, 24.0));
   }
 
-  // ── Submit: Handles BOTH create and update ────────────────────────────────
+  /// ── Submit: Handles BOTH create and update ────────────────────────────────
   Future<bool> submit() async {
     if (_studentProfile == null) {
       state = state.copyWith(errorMessage: 'No student profile found');
+      return false;
+    }
+
+    // Check if the student actually has a supervisor assigned
+    final supervisorId = _studentProfile!.currentSupervisorId; // Ensure this field name matches your StudentProfileModel
+    if (supervisorId == null || supervisorId.isEmpty) {
+      state = state.copyWith(errorMessage: 'No supervisor assigned. Please contact admin.');
       return false;
     }
 
@@ -139,16 +146,17 @@ class LogbookFormNotifier extends StateNotifier<LogbookFormState> {
       }
 
       final entry = LogbookEntryModel(
-        id: _editingEntryId, // Only set when editing
+        id: _editingEntryId, 
         studentRefPath: 'students/${currentUser.uid}',
         placementRefPath: _studentProfile!.currentPlacementId ?? '',
+        supervisorId: supervisorId, // <--- ADD THIS LINE (Fixes the error)
         date: state.selectedDate!,
-        dayNumber: 1, // TODO: replace with getNextDayNumber when needed
+        dayNumber: 1, // You could calculate this based on existing entries
         tasksPerformed: state.tasksPerformed.trim(),
         challenges: state.challenges,
         skillsLearned: state.skillsLearned,
         hoursWorked: state.hoursWorked,
-        status: 'draft', // Controller can override if needed
+        status: 'pending', // Usually, students submit straight to 'pending' for review
         createdAt: DateTime.now(),
       );
 
@@ -174,5 +182,4 @@ class LogbookFormNotifier extends StateNotifier<LogbookFormState> {
       );
       return false;
     }
-  }
-}
+  }}

@@ -12,13 +12,14 @@ _$LogbookEntryModelImpl _$$LogbookEntryModelImplFromJson(
       id: json['id'] as String?,
       studentRefPath: json['studentRefPath'] as String,
       placementRefPath: json['placementRefPath'] as String,
+      supervisorId: json['supervisorId'] as String,
       date: DateTime.parse(json['date'] as String),
       dayNumber: (json['dayNumber'] as num).toInt(),
       tasksPerformed: json['tasksPerformed'] as String,
       challenges: json['challenges'] as String?,
       skillsLearned: json['skillsLearned'] as String?,
       hoursWorked: (json['hoursWorked'] as num).toDouble(),
-      status: json['status'] as String? ?? 'draft',
+      status: json['status'] as String? ?? 'pending',
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.parse(json['createdAt'] as String),
@@ -27,12 +28,6 @@ _$LogbookEntryModelImpl _$$LogbookEntryModelImplFromJson(
           : DateTime.parse(json['updatedAt'] as String),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      checkInTime: json['checkInTime'] == null
-          ? null
-          : DateTime.parse(json['checkInTime'] as String),
-      checkOutTime: json['checkOutTime'] == null
-          ? null
-          : DateTime.parse(json['checkOutTime'] as String),
       photoUrl: json['photoUrl'] as String?,
       supervisorComment: json['supervisorComment'] as String?,
       approvedAt: json['approvedAt'] == null
@@ -46,6 +41,7 @@ Map<String, dynamic> _$$LogbookEntryModelImplToJson(
       'id': instance.id,
       'studentRefPath': instance.studentRefPath,
       'placementRefPath': instance.placementRefPath,
+      'supervisorId': instance.supervisorId,
       'date': instance.date.toIso8601String(),
       'dayNumber': instance.dayNumber,
       'tasksPerformed': instance.tasksPerformed,
@@ -57,8 +53,6 @@ Map<String, dynamic> _$$LogbookEntryModelImplToJson(
       'updatedAt': instance.updatedAt?.toIso8601String(),
       'latitude': instance.latitude,
       'longitude': instance.longitude,
-      'checkInTime': instance.checkInTime?.toIso8601String(),
-      'checkOutTime': instance.checkOutTime?.toIso8601String(),
       'photoUrl': instance.photoUrl,
       'supervisorComment': instance.supervisorComment,
       'approvedAt': instance.approvedAt?.toIso8601String(),
