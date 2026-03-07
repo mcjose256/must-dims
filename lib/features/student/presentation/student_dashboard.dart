@@ -17,19 +17,24 @@ import 'pages/student_profile_page.dart';
 
 final selectedStudentTabProvider = StateProvider<int>((ref) => 0);
 
-/// Returns a status banner widget based on current placement state.
-/// Handles all cases: no placement, pending, rejected, approved (not started).
+/// Derives the correct status banner based on the student's current placement.
+///
+/// Priority order (top = most urgent):
+///   1. No placement yet           → prompt to upload letter
+///   2. pendingSupervisorReview    → waiting on supervisor
+///   3. rejected                   → supervisor rejected, must resubmit
+///   4. approved (not started)     → approved, prompt to begin
+///   5. active / completed / etc.  → no banner needed
 final placementStatusBannerProvider = Provider<_BannerData?>((ref) {
   final placementAsync = ref.watch(currentPlacementProvider);
   final profileAsync = ref.watch(studentProfileProvider);
 
   return placementAsync.when(
     data: (placement) {
-      // ✅ BUG 2 FIX: Handle null placement — new student with no upload yet
+      // ── No placement document yet ────────────────────────────────────────
+      // Student is brand new or hasn't uploaded a letter yet.
       if (placement == null) {
-        // Only show the upload banner if the student hasn't started the process
         final profile = profileAsync.value;
-        // If internshipStatus is still notStarted, prompt them to upload
         if (profile == null ||
             profile.internshipStatus.name == 'notStarted') {
           return _BannerData(
@@ -45,38 +50,48 @@ final placementStatusBannerProvider = Provider<_BannerData?>((ref) {
       }
 
       switch (placement.status) {
-        case PlacementStatus.pending:
+        // ── Awaiting university supervisor review ──────────────────────────
+        case PlacementStatus.pendingSupervisorReview:
           return _BannerData(
-            status: 'pending',
-            title: 'Application Under Review',
-            subtitle: 'Your acceptance letter is awaiting admin approval',
+            status: 'pendingSupervisorReview',
+            title: 'Awaiting Supervisor Review',
+            subtitle: 'Your acceptance letter has been sent to your '
+                'university supervisor for approval',
             color: Colors.orange,
             icon: Icons.hourglass_top_rounded,
             route: '/student/placement-status',
           );
 
+        // ── Supervisor rejected the letter ─────────────────────────────────
+        // Show their exact feedback as the subtitle so the student knows
+        // what to fix without having to navigate anywhere.
         case PlacementStatus.rejected:
+          final feedback = placement.supervisorFeedback;
           return _BannerData(
             status: 'rejected',
-            title: 'Application Rejected',
-            subtitle: placement.adminNotes ?? 'Tap to upload a new letter',
+            title: 'Letter Needs Revision',
+            subtitle: (feedback != null && feedback.isNotEmpty)
+                ? 'Feedback: $feedback'
+                : 'Your letter was not approved — tap to resubmit',
             color: Colors.red,
             icon: Icons.cancel_rounded,
             route: '/student/upload-letter',
           );
 
+        // ── Supervisor approved — student can begin ────────────────────────
         case PlacementStatus.approved:
           return _BannerData(
             status: 'approved',
             title: 'Placement Approved! 🎉',
-            subtitle: 'Your placement is approved — tap to start your internship',
+            subtitle: 'Your supervisor approved your placement — '
+                'tap to start your internship',
             color: Colors.green,
             icon: Icons.check_circle_rounded,
             route: '/student/start-internship',
           );
 
         default:
-          // active, completed, etc. — no banner needed
+          // active, completed, extended, etc. — no banner needed
           return null;
       }
     },
@@ -159,11 +174,11 @@ class StudentDashboard extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Status Banner — shown when action is required from student
-          if (banner != null)
-            _PlacementStatusBanner(data: banner),
+          // ── Status Banner ──────────────────────────────────────────────
+          // Only shown when the student needs to take action or is waiting.
+          // Disappears automatically once internship is active.
+          if (banner != null) _PlacementStatusBanner(data: banner),
 
-          // Main Content
           Expanded(
             child: IndexedStack(
               index: selectedTab,
@@ -229,10 +244,14 @@ class _PlacementStatusBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: data.color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: data.color.withOpacity(0.4), width: 1.5),
+          border: Border.all(
+            color: data.color.withOpacity(0.4),
+            width: 1.5,
+          ),
         ),
         child: Row(
           children: [
+            // ── Status icon ──────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -242,6 +261,8 @@ class _PlacementStatusBanner extends StatelessWidget {
               child: Icon(data.icon, color: data.color, size: 22),
             ),
             const SizedBox(width: 14),
+
+            // ── Title + subtitle ─────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,7 +275,7 @@ class _PlacementStatusBanner extends StatelessWidget {
                       color: data.color,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     data.subtitle,
                     style: TextStyle(
@@ -269,9 +290,68 @@ class _PlacementStatusBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.arrow_forward_ios_rounded,
-                color: data.color, size: 14),
+
+            // ── Chevron — signals tappability ────────────────────────────
+            // Hidden for 'pending' since there's nothing to act on yet.
+            if (data.status != 'pendingSupervisorReview')
+              Icon(Icons.arrow_forward_ios_rounded,
+                  color: data.color, size: 14),
+
+            // ── Pulsing dot for pending — shows it's in progress ─────────
+            if (data.status == 'pendingSupervisorReview')
+              _PulsingDot(color: data.color),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// PULSING DOT — visual cue that something is actively being processed
+// ============================================================================
+
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
         ),
       ),
     );

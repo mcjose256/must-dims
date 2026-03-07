@@ -22,39 +22,38 @@ PlacementModel _$PlacementModelFromJson(Map<String, dynamic> json) {
 mixin _$PlacementModel {
   String get id => throw _privateConstructorUsedError;
   String get studentId => throw _privateConstructorUsedError;
-  String get companyId => throw _privateConstructorUsedError;
+  String get companyId =>
+      throw _privateConstructorUsedError; // University supervisor (auto-assigned via algorithm)
   String? get universitySupervisorId =>
-      throw _privateConstructorUsedError; // Linked from student's currentSupervisorId
-// Company supervisor details (from acceptance letter)
+      throw _privateConstructorUsedError; // Company supervisor details (from acceptance letter)
   String? get companySupervisorName => throw _privateConstructorUsedError;
   String? get companySupervisorEmail => throw _privateConstructorUsedError;
   String? get companySupervisorPhone => throw _privateConstructorUsedError;
   String? get companySupervisorId =>
-      throw _privateConstructorUsedError; // Will be set when company supervisor creates account
-// Acceptance letter
+      throw _privateConstructorUsedError; // Acceptance letter
   String? get acceptanceLetterUrl => throw _privateConstructorUsedError;
   String? get acceptanceLetterFileName => throw _privateConstructorUsedError;
   DateTime? get letterUploadedAt =>
-      throw _privateConstructorUsedError; // Status & approval
+      throw _privateConstructorUsedError; // ── Approval (now supervisor-driven, not admin) ──────────────────────────
   PlacementStatus get status => throw _privateConstructorUsedError;
-  String? get adminNotes =>
-      throw _privateConstructorUsedError; // Rejection reason or other notes
-  DateTime? get approvedAt => throw _privateConstructorUsedError;
-  String? get approvedByAdminId => throw _privateConstructorUsedError;
-  DateTime? get rejectedAt => throw _privateConstructorUsedError;
-  String? get rejectedByAdminId =>
-      throw _privateConstructorUsedError; // Internship timeline
+
+  /// Feedback left by the university supervisor on rejection.
+  /// Student sees this so they know what to fix before resubmitting.
+  String? get supervisorFeedback => throw _privateConstructorUsedError;
+  DateTime? get supervisorApprovedAt => throw _privateConstructorUsedError;
+  DateTime? get supervisorRejectedAt =>
+      throw _privateConstructorUsedError; // ── Internship timeline ──────────────────────────────────────────────────
   String get academicYear => throw _privateConstructorUsedError;
   DateTime? get startDate => throw _privateConstructorUsedError;
   DateTime? get endDate => throw _privateConstructorUsedError;
   DateTime? get actualEndDate => throw _privateConstructorUsedError;
-  int get totalWeeks => throw _privateConstructorUsedError; // Default 12 weeks
+  int get totalWeeks => throw _privateConstructorUsedError;
   int get weeksCompleted => throw _privateConstructorUsedError;
   double get progressPercentage =>
-      throw _privateConstructorUsedError; // Additional info
-  String? get studentNotes =>
-      throw _privateConstructorUsedError; // Why they chose this company
-  String? get remarks => throw _privateConstructorUsedError; // Timestamps
+      throw _privateConstructorUsedError; // ── Additional info ──────────────────────────────────────────────────────
+  String? get studentNotes => throw _privateConstructorUsedError;
+  String? get remarks =>
+      throw _privateConstructorUsedError; // ── Timestamps ───────────────────────────────────────────────────────────
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -83,11 +82,9 @@ abstract class $PlacementModelCopyWith<$Res> {
       String? acceptanceLetterFileName,
       DateTime? letterUploadedAt,
       PlacementStatus status,
-      String? adminNotes,
-      DateTime? approvedAt,
-      String? approvedByAdminId,
-      DateTime? rejectedAt,
-      String? rejectedByAdminId,
+      String? supervisorFeedback,
+      DateTime? supervisorApprovedAt,
+      DateTime? supervisorRejectedAt,
       String academicYear,
       DateTime? startDate,
       DateTime? endDate,
@@ -126,11 +123,9 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
     Object? acceptanceLetterFileName = freezed,
     Object? letterUploadedAt = freezed,
     Object? status = null,
-    Object? adminNotes = freezed,
-    Object? approvedAt = freezed,
-    Object? approvedByAdminId = freezed,
-    Object? rejectedAt = freezed,
-    Object? rejectedByAdminId = freezed,
+    Object? supervisorFeedback = freezed,
+    Object? supervisorApprovedAt = freezed,
+    Object? supervisorRejectedAt = freezed,
     Object? academicYear = null,
     Object? startDate = freezed,
     Object? endDate = freezed,
@@ -192,26 +187,18 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as PlacementStatus,
-      adminNotes: freezed == adminNotes
-          ? _value.adminNotes
-          : adminNotes // ignore: cast_nullable_to_non_nullable
+      supervisorFeedback: freezed == supervisorFeedback
+          ? _value.supervisorFeedback
+          : supervisorFeedback // ignore: cast_nullable_to_non_nullable
               as String?,
-      approvedAt: freezed == approvedAt
-          ? _value.approvedAt
-          : approvedAt // ignore: cast_nullable_to_non_nullable
+      supervisorApprovedAt: freezed == supervisorApprovedAt
+          ? _value.supervisorApprovedAt
+          : supervisorApprovedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      approvedByAdminId: freezed == approvedByAdminId
-          ? _value.approvedByAdminId
-          : approvedByAdminId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      rejectedAt: freezed == rejectedAt
-          ? _value.rejectedAt
-          : rejectedAt // ignore: cast_nullable_to_non_nullable
+      supervisorRejectedAt: freezed == supervisorRejectedAt
+          ? _value.supervisorRejectedAt
+          : supervisorRejectedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      rejectedByAdminId: freezed == rejectedByAdminId
-          ? _value.rejectedByAdminId
-          : rejectedByAdminId // ignore: cast_nullable_to_non_nullable
-              as String?,
       academicYear: null == academicYear
           ? _value.academicYear
           : academicYear // ignore: cast_nullable_to_non_nullable
@@ -281,11 +268,9 @@ abstract class _$$PlacementModelImplCopyWith<$Res>
       String? acceptanceLetterFileName,
       DateTime? letterUploadedAt,
       PlacementStatus status,
-      String? adminNotes,
-      DateTime? approvedAt,
-      String? approvedByAdminId,
-      DateTime? rejectedAt,
-      String? rejectedByAdminId,
+      String? supervisorFeedback,
+      DateTime? supervisorApprovedAt,
+      DateTime? supervisorRejectedAt,
       String academicYear,
       DateTime? startDate,
       DateTime? endDate,
@@ -322,11 +307,9 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
     Object? acceptanceLetterFileName = freezed,
     Object? letterUploadedAt = freezed,
     Object? status = null,
-    Object? adminNotes = freezed,
-    Object? approvedAt = freezed,
-    Object? approvedByAdminId = freezed,
-    Object? rejectedAt = freezed,
-    Object? rejectedByAdminId = freezed,
+    Object? supervisorFeedback = freezed,
+    Object? supervisorApprovedAt = freezed,
+    Object? supervisorRejectedAt = freezed,
     Object? academicYear = null,
     Object? startDate = freezed,
     Object? endDate = freezed,
@@ -388,26 +371,18 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as PlacementStatus,
-      adminNotes: freezed == adminNotes
-          ? _value.adminNotes
-          : adminNotes // ignore: cast_nullable_to_non_nullable
+      supervisorFeedback: freezed == supervisorFeedback
+          ? _value.supervisorFeedback
+          : supervisorFeedback // ignore: cast_nullable_to_non_nullable
               as String?,
-      approvedAt: freezed == approvedAt
-          ? _value.approvedAt
-          : approvedAt // ignore: cast_nullable_to_non_nullable
+      supervisorApprovedAt: freezed == supervisorApprovedAt
+          ? _value.supervisorApprovedAt
+          : supervisorApprovedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      approvedByAdminId: freezed == approvedByAdminId
-          ? _value.approvedByAdminId
-          : approvedByAdminId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      rejectedAt: freezed == rejectedAt
-          ? _value.rejectedAt
-          : rejectedAt // ignore: cast_nullable_to_non_nullable
+      supervisorRejectedAt: freezed == supervisorRejectedAt
+          ? _value.supervisorRejectedAt
+          : supervisorRejectedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      rejectedByAdminId: freezed == rejectedByAdminId
-          ? _value.rejectedByAdminId
-          : rejectedByAdminId // ignore: cast_nullable_to_non_nullable
-              as String?,
       academicYear: null == academicYear
           ? _value.academicYear
           : academicYear // ignore: cast_nullable_to_non_nullable
@@ -471,12 +446,10 @@ class _$PlacementModelImpl implements _PlacementModel {
       this.acceptanceLetterUrl,
       this.acceptanceLetterFileName,
       this.letterUploadedAt,
-      this.status = PlacementStatus.pending,
-      this.adminNotes,
-      this.approvedAt,
-      this.approvedByAdminId,
-      this.rejectedAt,
-      this.rejectedByAdminId,
+      this.status = PlacementStatus.pendingSupervisorReview,
+      this.supervisorFeedback,
+      this.supervisorApprovedAt,
+      this.supervisorRejectedAt,
       required this.academicYear,
       this.startDate,
       this.endDate,
@@ -498,9 +471,9 @@ class _$PlacementModelImpl implements _PlacementModel {
   final String studentId;
   @override
   final String companyId;
+// University supervisor (auto-assigned via algorithm)
   @override
   final String? universitySupervisorId;
-// Linked from student's currentSupervisorId
 // Company supervisor details (from acceptance letter)
   @override
   final String? companySupervisorName;
@@ -510,7 +483,6 @@ class _$PlacementModelImpl implements _PlacementModel {
   final String? companySupervisorPhone;
   @override
   final String? companySupervisorId;
-// Will be set when company supervisor creates account
 // Acceptance letter
   @override
   final String? acceptanceLetterUrl;
@@ -518,22 +490,20 @@ class _$PlacementModelImpl implements _PlacementModel {
   final String? acceptanceLetterFileName;
   @override
   final DateTime? letterUploadedAt;
-// Status & approval
+// ── Approval (now supervisor-driven, not admin) ──────────────────────────
   @override
   @JsonKey()
   final PlacementStatus status;
+
+  /// Feedback left by the university supervisor on rejection.
+  /// Student sees this so they know what to fix before resubmitting.
   @override
-  final String? adminNotes;
-// Rejection reason or other notes
+  final String? supervisorFeedback;
   @override
-  final DateTime? approvedAt;
+  final DateTime? supervisorApprovedAt;
   @override
-  final String? approvedByAdminId;
-  @override
-  final DateTime? rejectedAt;
-  @override
-  final String? rejectedByAdminId;
-// Internship timeline
+  final DateTime? supervisorRejectedAt;
+// ── Internship timeline ──────────────────────────────────────────────────
   @override
   final String academicYear;
   @override
@@ -545,20 +515,18 @@ class _$PlacementModelImpl implements _PlacementModel {
   @override
   @JsonKey()
   final int totalWeeks;
-// Default 12 weeks
   @override
   @JsonKey()
   final int weeksCompleted;
   @override
   @JsonKey()
   final double progressPercentage;
-// Additional info
+// ── Additional info ──────────────────────────────────────────────────────
   @override
   final String? studentNotes;
-// Why they chose this company
   @override
   final String? remarks;
-// Timestamps
+// ── Timestamps ───────────────────────────────────────────────────────────
   @override
   final DateTime? createdAt;
   @override
@@ -566,7 +534,7 @@ class _$PlacementModelImpl implements _PlacementModel {
 
   @override
   String toString() {
-    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, adminNotes: $adminNotes, approvedAt: $approvedAt, approvedByAdminId: $approvedByAdminId, rejectedAt: $rejectedAt, rejectedByAdminId: $rejectedByAdminId, academicYear: $academicYear, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, supervisorFeedback: $supervisorFeedback, supervisorApprovedAt: $supervisorApprovedAt, supervisorRejectedAt: $supervisorRejectedAt, academicYear: $academicYear, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -597,16 +565,12 @@ class _$PlacementModelImpl implements _PlacementModel {
             (identical(other.letterUploadedAt, letterUploadedAt) ||
                 other.letterUploadedAt == letterUploadedAt) &&
             (identical(other.status, status) || other.status == status) &&
-            (identical(other.adminNotes, adminNotes) ||
-                other.adminNotes == adminNotes) &&
-            (identical(other.approvedAt, approvedAt) ||
-                other.approvedAt == approvedAt) &&
-            (identical(other.approvedByAdminId, approvedByAdminId) ||
-                other.approvedByAdminId == approvedByAdminId) &&
-            (identical(other.rejectedAt, rejectedAt) ||
-                other.rejectedAt == rejectedAt) &&
-            (identical(other.rejectedByAdminId, rejectedByAdminId) ||
-                other.rejectedByAdminId == rejectedByAdminId) &&
+            (identical(other.supervisorFeedback, supervisorFeedback) ||
+                other.supervisorFeedback == supervisorFeedback) &&
+            (identical(other.supervisorApprovedAt, supervisorApprovedAt) ||
+                other.supervisorApprovedAt == supervisorApprovedAt) &&
+            (identical(other.supervisorRejectedAt, supervisorRejectedAt) ||
+                other.supervisorRejectedAt == supervisorRejectedAt) &&
             (identical(other.academicYear, academicYear) ||
                 other.academicYear == academicYear) &&
             (identical(other.startDate, startDate) ||
@@ -645,11 +609,9 @@ class _$PlacementModelImpl implements _PlacementModel {
         acceptanceLetterFileName,
         letterUploadedAt,
         status,
-        adminNotes,
-        approvedAt,
-        approvedByAdminId,
-        rejectedAt,
-        rejectedByAdminId,
+        supervisorFeedback,
+        supervisorApprovedAt,
+        supervisorRejectedAt,
         academicYear,
         startDate,
         endDate,
@@ -692,11 +654,9 @@ abstract class _PlacementModel implements PlacementModel {
       final String? acceptanceLetterFileName,
       final DateTime? letterUploadedAt,
       final PlacementStatus status,
-      final String? adminNotes,
-      final DateTime? approvedAt,
-      final String? approvedByAdminId,
-      final DateTime? rejectedAt,
-      final String? rejectedByAdminId,
+      final String? supervisorFeedback,
+      final DateTime? supervisorApprovedAt,
+      final DateTime? supervisorRejectedAt,
       required final String academicYear,
       final DateTime? startDate,
       final DateTime? endDate,
@@ -718,10 +678,9 @@ abstract class _PlacementModel implements PlacementModel {
   String get studentId;
   @override
   String get companyId;
-  @override
+  @override // University supervisor (auto-assigned via algorithm)
   String? get universitySupervisorId;
-  @override // Linked from student's currentSupervisorId
-// Company supervisor details (from acceptance letter)
+  @override // Company supervisor details (from acceptance letter)
   String? get companySupervisorName;
   @override
   String? get companySupervisorEmail;
@@ -729,26 +688,24 @@ abstract class _PlacementModel implements PlacementModel {
   String? get companySupervisorPhone;
   @override
   String? get companySupervisorId;
-  @override // Will be set when company supervisor creates account
-// Acceptance letter
+  @override // Acceptance letter
   String? get acceptanceLetterUrl;
   @override
   String? get acceptanceLetterFileName;
   @override
   DateTime? get letterUploadedAt;
-  @override // Status & approval
+  @override // ── Approval (now supervisor-driven, not admin) ──────────────────────────
   PlacementStatus get status;
   @override
-  String? get adminNotes;
-  @override // Rejection reason or other notes
-  DateTime? get approvedAt;
+
+  /// Feedback left by the university supervisor on rejection.
+  /// Student sees this so they know what to fix before resubmitting.
+  String? get supervisorFeedback;
   @override
-  String? get approvedByAdminId;
+  DateTime? get supervisorApprovedAt;
   @override
-  DateTime? get rejectedAt;
-  @override
-  String? get rejectedByAdminId;
-  @override // Internship timeline
+  DateTime? get supervisorRejectedAt;
+  @override // ── Internship timeline ──────────────────────────────────────────────────
   String get academicYear;
   @override
   DateTime? get startDate;
@@ -758,15 +715,15 @@ abstract class _PlacementModel implements PlacementModel {
   DateTime? get actualEndDate;
   @override
   int get totalWeeks;
-  @override // Default 12 weeks
+  @override
   int get weeksCompleted;
   @override
   double get progressPercentage;
-  @override // Additional info
+  @override // ── Additional info ──────────────────────────────────────────────────────
   String? get studentNotes;
-  @override // Why they chose this company
+  @override
   String? get remarks;
-  @override // Timestamps
+  @override // ── Timestamps ───────────────────────────────────────────────────────────
   DateTime? get createdAt;
   @override
   DateTime? get updatedAt;

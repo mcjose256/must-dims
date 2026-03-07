@@ -60,7 +60,17 @@ class _UploadAcceptanceLetterPageState
   bool _isUploading = false;
   DateTime? _selectedStartDate;
 
+  // Supervisor info fetched from student profile
+  String? _universitySupervisorId;
+  String? _universitySupervisorName;
+
   static const int _totalSteps = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAssignedSupervisor();
+  }
 
   @override
   void dispose() {
@@ -73,6 +83,42 @@ class _UploadAcceptanceLetterPageState
     super.dispose();
   }
 
+  // ── Fetch assigned university supervisor ─────────────────────────────────
+  // We fetch this early so the student knows who will review their letter.
+
+  Future<void> _fetchAssignedSupervisor() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final studentDoc = await FirebaseFirestore.instance
+          .collection('students')
+          .doc(user.uid)
+          .get();
+
+      final supervisorId =
+          studentDoc.data()?['currentSupervisorId'] as String?;
+      if (supervisorId == null) return;
+
+      final supervisorDoc = await FirebaseFirestore.instance
+          .collection('supervisorProfiles')
+          .doc(supervisorId)
+          .get();
+
+      final supervisorName =
+          supervisorDoc.data()?['fullName'] as String? ?? 'Your Supervisor';
+
+      if (mounted) {
+        setState(() {
+          _universitySupervisorId = supervisorId;
+          _universitySupervisorName = supervisorName;
+        });
+      }
+    } catch (_) {
+      // Non-critical — supervisor info is fetched again on submit
+    }
+  }
+
   // ── Step validation ──────────────────────────────────────────────────────
 
   bool _validateStep(int step) {
@@ -83,12 +129,12 @@ class _UploadAcceptanceLetterPageState
           return false;
         }
         if (_supervisorNameController.text.trim().isEmpty) {
-          _showError('Please enter the supervisor\'s full name.');
+          _showError('Please enter the company supervisor\'s full name.');
           return false;
         }
         if (_supervisorEmailController.text.trim().isEmpty ||
             !_supervisorEmailController.text.contains('@')) {
-          _showError('Please enter a valid supervisor email.');
+          _showError('Please enter a valid company supervisor email.');
           return false;
         }
         return true;
@@ -205,14 +251,14 @@ class _UploadAcceptanceLetterPageState
       await storageRef.putFile(_selectedFile!);
       final downloadUrl = await storageRef.getDownloadURL();
 
-      // 2. Fetch student data
+      // 2. Fetch student data (re-fetch for accuracy)
       final studentDoc = await FirebaseFirestore.instance
           .collection('students')
           .doc(user.uid)
           .get();
       final studentData = studentDoc.data();
       final universitySupervisorId =
-          studentData?['currentSupervisorId'] as String?;
+          _universitySupervisorId ?? studentData?['currentSupervisorId'] as String?;
       final academicYear = studentData?['academicYear']?.toString() ??
           DateTime.now().year.toString();
 
@@ -222,6 +268,8 @@ class _UploadAcceptanceLetterPageState
           _selectedStartDate?.add(Duration(days: totalWeeks * 7));
 
       // 4. Create placement document
+      // Status is now 'pendingSupervisorReview' — goes to university supervisor,
+      // NOT admin. Admin is no longer in the acceptance letter approval chain.
       final placementRef =
           await FirebaseFirestore.instance.collection('placements').add({
         'studentId': user.uid,
@@ -237,7 +285,8 @@ class _UploadAcceptanceLetterPageState
         'acceptanceLetterUrl': downloadUrl,
         'acceptanceLetterFileName': _fileName,
         'letterUploadedAt': FieldValue.serverTimestamp(),
-        'status': PlacementStatus.pending.name,
+        'status': PlacementStatus.pendingSupervisorReview.name,
+        'supervisorFeedback': null,
         'academicYear': academicYear,
         'startDate': _selectedStartDate != null
             ? Timestamp.fromDate(_selectedStartDate!)
@@ -253,13 +302,12 @@ class _UploadAcceptanceLetterPageState
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // ✅ BUG 1 FIX: Write currentPlacementId back to student profile
-      // Without this, currentPlacementProvider always returns null
+      // 5. Update student profile
       await FirebaseFirestore.instance
           .collection('students')
           .doc(user.uid)
           .update({
-        'currentPlacementId': placementRef.id,  // ← THE CRITICAL FIX
+        'currentPlacementId': placementRef.id,
         'internshipStatus': 'awaitingApproval',
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -279,6 +327,9 @@ class _UploadAcceptanceLetterPageState
   }
 
   void _showSuccessDialog() {
+    final supervisorDisplay =
+        _universitySupervisorName ?? 'your assigned supervisor';
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -301,7 +352,7 @@ class _UploadAcceptanceLetterPageState
               ),
               const SizedBox(height: 24),
               const Text(
-                'Application Submitted!',
+                'Letter Submitted!',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -309,14 +360,30 @@ class _UploadAcceptanceLetterPageState
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              Text(
-                'Your acceptance letter has been submitted. An admin will review and approve your placement shortly.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  height: 1.5,
-                ),
+              // ── Key change: tells the student WHO reviews it ─────────────
+              RichText(
                 textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    height: 1.6,
+                  ),
+                  children: [
+                    const TextSpan(
+                        text: 'Your acceptance letter has been sent to '),
+                    TextSpan(
+                      text: supervisorDisplay,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const TextSpan(
+                        text:
+                            ' for review. You will be notified once they approve or provide feedback.'),
+                  ],
+                ),
               ),
               const SizedBox(height: 28),
               SizedBox(
@@ -418,80 +485,76 @@ class _UploadAcceptanceLetterPageState
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(_totalSteps, (i) {
-              final isActive = i == _currentStep;
-              final isDone = i < _currentStep;
-              return Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDone
-                                  ? Colors.green
-                                  : isActive
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.surfaceContainerHighest,
-                            ),
-                            child: Center(
-                              child: isDone
-                                  ? const Icon(Icons.check,
-                                      color: Colors.white, size: 16)
-                                  : Text(
-                                      '${i + 1}',
-                                      style: TextStyle(
-                                        color: isActive
-                                            ? Colors.white
-                                            : theme.colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            steps[i],
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: isActive
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (i < _totalSteps - 1)
-                      Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          height: 2,
-                          margin: const EdgeInsets.only(bottom: 22),
-                          color: i < _currentStep
+      child: Row(
+        children: List.generate(_totalSteps, (i) {
+          final isActive = i == _currentStep;
+          final isDone = i < _currentStep;
+          return Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone
                               ? Colors.green
-                              : theme.colorScheme.surfaceContainerHighest,
+                              : isActive
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.surfaceContainerHighest,
+                        ),
+                        child: Center(
+                          child: isDone
+                              ? const Icon(Icons.check,
+                                  color: Colors.white, size: 16)
+                              : Text(
+                                  '${i + 1}',
+                                  style: TextStyle(
+                                    color: isActive
+                                        ? Colors.white
+                                        : theme.colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        steps[i],
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isActive
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-              );
-            }),
-          ),
-        ],
+                if (i < _totalSteps - 1)
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      height: 2,
+                      margin: const EdgeInsets.only(bottom: 22),
+                      color: i < _currentStep
+                          ? Colors.green
+                          : theme.colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
@@ -505,17 +568,59 @@ class _UploadAcceptanceLetterPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Reviewer info banner ─────────────────────────────────────────
+          // Show the student who will review their letter upfront.
+          // This builds trust and sets expectations early.
+          if (_universitySupervisorName != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.school_outlined,
+                      color: theme.colorScheme.primary, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onPrimaryContainer,
+                          height: 1.5,
+                        ),
+                        children: [
+                          const TextSpan(
+                              text: 'Your letter will be reviewed by '),
+                          TextSpan(
+                            text: _universitySupervisorName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const TextSpan(text: ', your assigned university supervisor.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           _SectionHeader(
             icon: Icons.business,
             title: 'Company Selection',
-            subtitle: 'Select the company where you will be doing your internship',
+            subtitle:
+                'Select the company where you will be doing your internship',
           ),
           const SizedBox(height: 16),
           companiesAsync.when(
             data: (companies) {
-              if (companies.isEmpty) {
-                return _EmptyCompaniesCard();
-              }
+              if (companies.isEmpty) return _EmptyCompaniesCard();
               return DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   hintText: 'Select a company',
@@ -642,25 +747,24 @@ class _UploadAcceptanceLetterPageState
                 'Upload the official acceptance letter from your company. Accepted formats: PDF, JPG, PNG (max 5MB)',
           ),
           const SizedBox(height: 24),
-
-          // Upload area
           GestureDetector(
             onTap: _pickFile,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
               decoration: BoxDecoration(
                 color: _selectedFile != null
                     ? Colors.green.shade50
-                    : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    : theme.colorScheme.surfaceContainerHighest
+                        .withOpacity(0.5),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: _selectedFile != null
                       ? Colors.green.shade400
                       : theme.colorScheme.outline.withOpacity(0.4),
                   width: 2,
-                  style: BorderStyle.solid,
                 ),
               ),
               child: Column(
@@ -677,9 +781,7 @@ class _UploadAcceptanceLetterPageState
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _selectedFile != null
-                        ? 'File Selected!'
-                        : 'Tap to Upload File',
+                    _selectedFile != null ? 'File Selected!' : 'Tap to Upload File',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -719,12 +821,12 @@ class _UploadAcceptanceLetterPageState
               ),
             ),
           ),
-
           const SizedBox(height: 28),
           _SectionHeader(
             icon: Icons.notes_outlined,
             title: 'Additional Notes (Optional)',
-            subtitle: 'Why did you choose this company? What do you hope to learn?',
+            subtitle:
+                'Why did you choose this company? What do you hope to learn?',
           ),
           const SizedBox(height: 16),
           TextField(
@@ -757,11 +859,11 @@ class _UploadAcceptanceLetterPageState
           _SectionHeader(
             icon: Icons.fact_check_outlined,
             title: 'Review Your Application',
-            subtitle: 'Please confirm all details are correct before submitting',
+            subtitle:
+                'Please confirm all details are correct before submitting',
           ),
           const SizedBox(height: 20),
 
-          // Company card
           _ReviewCard(
             title: 'Company',
             icon: Icons.business,
@@ -774,9 +876,8 @@ class _UploadAcceptanceLetterPageState
           ),
           const SizedBox(height: 12),
 
-          // Supervisor card
           _ReviewCard(
-            title: 'Supervisor',
+            title: 'Company Supervisor',
             icon: Icons.person,
             color: Colors.purple,
             items: {
@@ -788,7 +889,19 @@ class _UploadAcceptanceLetterPageState
           ),
           const SizedBox(height: 12),
 
-          // Timeline card
+          // ── Who reviews this letter ──────────────────────────────────────
+          if (_universitySupervisorName != null)
+            _ReviewCard(
+              title: 'University Supervisor',
+              icon: Icons.school,
+              color: Colors.teal,
+              items: {
+                'Reviewer': _universitySupervisorName!,
+                'Action': 'Will approve or request changes',
+              },
+            ),
+          const SizedBox(height: 12),
+
           _ReviewCard(
             title: 'Timeline',
             icon: Icons.schedule,
@@ -805,14 +918,14 @@ class _UploadAcceptanceLetterPageState
           ),
           const SizedBox(height: 12),
 
-          // Document card
           _ReviewCard(
             title: 'Acceptance Letter',
             icon: Icons.description,
             color: Colors.green,
             items: {
               'File': _fileName ?? 'No file selected',
-              'Status': _selectedFile != null ? '✅ Ready to upload' : '❌ Missing',
+              'Status':
+                  _selectedFile != null ? '✅ Ready to upload' : '❌ Missing',
             },
           ),
 
@@ -835,7 +948,7 @@ class _UploadAcceptanceLetterPageState
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Once submitted, your application will be reviewed by the admin. You will be notified when it is approved or rejected.',
+                    'Your letter will be sent directly to your assigned university supervisor for review. You will be notified of their decision.',
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onPrimaryContainer,
@@ -898,7 +1011,9 @@ class _UploadAcceptanceLetterPageState
                   Text(isLastStep ? 'Submit Application' : 'Continue'),
                   const SizedBox(width: 8),
                   Icon(
-                    isLastStep ? Icons.send_rounded : Icons.arrow_forward_rounded,
+                    isLastStep
+                        ? Icons.send_rounded
+                        : Icons.arrow_forward_rounded,
                     size: 18,
                   ),
                 ],
@@ -951,7 +1066,9 @@ class _SectionHeader extends StatelessWidget {
               const SizedBox(height: 3),
               Text(subtitle,
                   style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      height: 1.4)),
             ],
           ),
         ),
@@ -983,7 +1100,8 @@ class _StyledTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         prefixIcon: Icon(icon),
         filled: true,
       ),

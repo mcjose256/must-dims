@@ -22,16 +22,14 @@ _$PlacementModelImpl _$$PlacementModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['letterUploadedAt'] as String),
       status: $enumDecodeNullable(_$PlacementStatusEnumMap, json['status']) ??
-          PlacementStatus.pending,
-      adminNotes: json['adminNotes'] as String?,
-      approvedAt: json['approvedAt'] == null
+          PlacementStatus.pendingSupervisorReview,
+      supervisorFeedback: json['supervisorFeedback'] as String?,
+      supervisorApprovedAt: json['supervisorApprovedAt'] == null
           ? null
-          : DateTime.parse(json['approvedAt'] as String),
-      approvedByAdminId: json['approvedByAdminId'] as String?,
-      rejectedAt: json['rejectedAt'] == null
+          : DateTime.parse(json['supervisorApprovedAt'] as String),
+      supervisorRejectedAt: json['supervisorRejectedAt'] == null
           ? null
-          : DateTime.parse(json['rejectedAt'] as String),
-      rejectedByAdminId: json['rejectedByAdminId'] as String?,
+          : DateTime.parse(json['supervisorRejectedAt'] as String),
       academicYear: json['academicYear'] as String,
       startDate: json['startDate'] == null
           ? null
@@ -71,11 +69,9 @@ Map<String, dynamic> _$$PlacementModelImplToJson(
       'acceptanceLetterFileName': instance.acceptanceLetterFileName,
       'letterUploadedAt': instance.letterUploadedAt?.toIso8601String(),
       'status': _$PlacementStatusEnumMap[instance.status]!,
-      'adminNotes': instance.adminNotes,
-      'approvedAt': instance.approvedAt?.toIso8601String(),
-      'approvedByAdminId': instance.approvedByAdminId,
-      'rejectedAt': instance.rejectedAt?.toIso8601String(),
-      'rejectedByAdminId': instance.rejectedByAdminId,
+      'supervisorFeedback': instance.supervisorFeedback,
+      'supervisorApprovedAt': instance.supervisorApprovedAt?.toIso8601String(),
+      'supervisorRejectedAt': instance.supervisorRejectedAt?.toIso8601String(),
       'academicYear': instance.academicYear,
       'startDate': instance.startDate?.toIso8601String(),
       'endDate': instance.endDate?.toIso8601String(),
@@ -90,7 +86,7 @@ Map<String, dynamic> _$$PlacementModelImplToJson(
     };
 
 const _$PlacementStatusEnumMap = {
-  PlacementStatus.pending: 'pending',
+  PlacementStatus.pendingSupervisorReview: 'pendingSupervisorReview',
   PlacementStatus.approved: 'approved',
   PlacementStatus.rejected: 'rejected',
   PlacementStatus.active: 'active',

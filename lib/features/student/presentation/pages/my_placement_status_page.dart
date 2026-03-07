@@ -1,3 +1,4 @@
+// lib/features/student/presentation/pages/my_placement_status_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -24,22 +25,21 @@ final studentPlacementProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       .limit(1)
       .snapshots()
       .asyncMap((snapshot) async {
-        if (snapshot.docs.isEmpty) return null;
+    if (snapshot.docs.isEmpty) return null;
 
-        final placementDoc = snapshot.docs.first;
-        final placement = PlacementModel.fromFirestore(placementDoc, null);
+    final placementDoc = snapshot.docs.first;
+    final placement = PlacementModel.fromFirestore(placementDoc, null);
 
-        // Get company details
-        final companyDoc = await FirebaseFirestore.instance
-            .collection('companies')
-            .doc(placement.companyId)
-            .get();
+    final companyDoc = await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(placement.companyId)
+        .get();
 
-        return {
-          'placement': placement,
-          'company': companyDoc.data(),
-        };
-      });
+    return {
+      'placement': placement,
+      'company': companyDoc.data(),
+    };
+  });
 });
 
 // ============================================================================
@@ -59,7 +59,7 @@ class MyPlacementStatusPage extends ConsumerWidget {
         title: const Text('My Placement'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.go('/student/dashboard'),
         ),
       ),
       body: RefreshIndicator(
@@ -74,19 +74,18 @@ class MyPlacementStatusPage extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.business_center, size: 64, color: Colors.grey[400]),
+                    Icon(Icons.business_center,
+                        size: 64, color: Colors.grey[400]),
                     const SizedBox(height: 16),
-                    Text(
-                      'No Placement Yet',
-                      style: theme.textTheme.titleLarge,
-                    ),
+                    Text('No Placement Yet',
+                        style: theme.textTheme.titleLarge),
                     const SizedBox(height: 8),
-                    const Text('Upload your acceptance letter to get started'),
+                    const Text(
+                        'Upload your acceptance letter to get started'),
                     const SizedBox(height: 24),
                     FilledButton.icon(
-                      onPressed: () {
-                        context.go('/student/upload-letter');
-                      },
+                      onPressed: () =>
+                          context.go('/student/upload-letter'),
                       icon: const Icon(Icons.upload_file),
                       label: const Text('Upload Acceptance Letter'),
                     ),
@@ -108,6 +107,14 @@ class MyPlacementStatusPage extends ConsumerWidget {
                   _buildStatusBanner(context, placement),
                   const SizedBox(height: 24),
 
+                  // Supervisor feedback card — only on rejection
+                  if (placement.status == PlacementStatus.rejected &&
+                      placement.supervisorFeedback != null &&
+                      placement.supervisorFeedback!.isNotEmpty) ...[
+                    _buildFeedbackCard(placement, theme),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Company Info
                   Card(
                     child: Padding(
@@ -118,20 +125,21 @@ class MyPlacementStatusPage extends ConsumerWidget {
                           Text(
                             'Company Information',
                             style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                                fontWeight: FontWeight.bold),
                           ),
                           const Divider(height: 24),
                           _InfoRow('Company', company?['name'] ?? 'Unknown'),
-                          _InfoRow('Industry', company?['industry'] ?? 'N/A'),
-                          _InfoRow('Location', company?['location'] ?? 'N/A'),
+                          _InfoRow(
+                              'Industry', company?['industry'] ?? 'N/A'),
+                          _InfoRow(
+                              'Location', company?['location'] ?? 'N/A'),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Supervisor Info
+                  // Company Supervisor Info
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -141,14 +149,16 @@ class MyPlacementStatusPage extends ConsumerWidget {
                           Text(
                             'Company Supervisor',
                             style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                                fontWeight: FontWeight.bold),
                           ),
                           const Divider(height: 24),
-                          _InfoRow('Name', placement.companySupervisorName ?? 'N/A'),
-                          _InfoRow('Email', placement.companySupervisorEmail ?? 'N/A'),
+                          _InfoRow('Name',
+                              placement.companySupervisorName ?? 'N/A'),
+                          _InfoRow('Email',
+                              placement.companySupervisorEmail ?? 'N/A'),
                           if (placement.companySupervisorPhone != null)
-                            _InfoRow('Phone', placement.companySupervisorPhone!),
+                            _InfoRow(
+                                'Phone', placement.companySupervisorPhone!),
                         ],
                       ),
                     ),
@@ -168,29 +178,34 @@ class MyPlacementStatusPage extends ConsumerWidget {
                             Text(
                               'Timeline',
                               style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontWeight: FontWeight.bold),
                             ),
                             const Divider(height: 24),
                             if (placement.startDate != null)
                               _InfoRow(
                                 'Start Date',
-                                DateFormat('MMM dd, yyyy').format(placement.startDate!),
+                                DateFormat('MMM dd, yyyy')
+                                    .format(placement.startDate!),
                               ),
                             if (placement.endDate != null)
                               _InfoRow(
                                 'End Date',
-                                DateFormat('MMM dd, yyyy').format(placement.endDate!),
+                                DateFormat('MMM dd, yyyy')
+                                    .format(placement.endDate!),
                               ),
-                            _InfoRow('Duration', '${placement.totalWeeks} weeks'),
-                            if (placement.status == PlacementStatus.active) ...[
+                            _InfoRow(
+                                'Duration', '${placement.totalWeeks} weeks'),
+                            if (placement.status ==
+                                PlacementStatus.active) ...[
                               _InfoRow(
                                 'Completed',
-                                '${placement.weeksCompleted} / ${placement.totalWeeks} weeks',
+                                '${placement.weeksCompleted} / '
+                                    '${placement.totalWeeks} weeks',
                               ),
                               const SizedBox(height: 8),
                               LinearProgressIndicator(
-                                value: placement.weeksCompleted / placement.totalWeeks,
+                                value: placement.weeksCompleted /
+                                    placement.totalWeeks,
                                 minHeight: 8,
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -205,7 +220,8 @@ class MyPlacementStatusPage extends ConsumerWidget {
                   // Acceptance Letter Viewer
                   _AcceptanceLetterViewer(
                     fileUrl: placement.acceptanceLetterUrl,
-                    fileName: placement.acceptanceLetterFileName ?? 'acceptance_letter',
+                    fileName: placement.acceptanceLetterFileName ??
+                        'acceptance_letter',
                     uploadedAt: placement.letterUploadedAt,
                   ),
                   const SizedBox(height: 24),
@@ -215,29 +231,30 @@ class MyPlacementStatusPage extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          context.go('/student/start-internship');
-                        },
+                        onPressed: () =>
+                            context.go('/student/start-internship'),
                         icon: const Icon(Icons.play_arrow),
                         label: const Text('Start Internship'),
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
                     ),
 
                   if (placement.status == PlacementStatus.rejected) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          context.go('/student/upload-letter');
-                        },
+                        onPressed: () =>
+                            context.go('/student/upload-letter'),
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Upload New Letter'),
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.red.shade600,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
                     ),
@@ -246,17 +263,20 @@ class MyPlacementStatusPage extends ConsumerWidget {
               ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
           error: (error, stack) => Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const Icon(Icons.error_outline,
+                    size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 Text('Error: $error'),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: () => ref.invalidate(studentPlacementProvider),
+                  onPressed: () =>
+                      ref.invalidate(studentPlacementProvider),
                   child: const Text('Retry'),
                 ),
               ],
@@ -267,36 +287,88 @@ class MyPlacementStatusPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusBanner(BuildContext context, PlacementModel placement) {
+  // ── Supervisor feedback card ─────────────────────────────────────────────
+  // Prominently shows WHY the letter was rejected so the student
+  // knows exactly what to fix before resubmitting.
+
+  Widget _buildFeedbackCard(PlacementModel placement, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade300, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.feedback_outlined,
+                  color: Colors.red.shade600, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Supervisor Feedback',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            placement.supervisorFeedback!,
+            style: TextStyle(
+                fontSize: 14, color: Colors.red.shade800, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Status banner ────────────────────────────────────────────────────────
+
+  Widget _buildStatusBanner(
+      BuildContext context, PlacementModel placement) {
     Color color;
     IconData icon;
     String title;
     String subtitle;
 
     switch (placement.status) {
-      case PlacementStatus.pending:
+      // ── Updated: pending → pendingSupervisorReview ─────────────────────
+      case PlacementStatus.pendingSupervisorReview:
         color = Colors.orange;
-        icon = Icons.hourglass_empty;
-        title = 'Pending Review';
-        subtitle = 'Your acceptance letter is under review by admin';
+        icon = Icons.hourglass_top_rounded;
+        title = 'Awaiting Supervisor Review';
+        subtitle =
+            'Your acceptance letter has been sent to your university supervisor';
         break;
       case PlacementStatus.approved:
         color = Colors.green;
         icon = Icons.check_circle;
         title = 'Approved!';
-        subtitle = 'You can now start your internship';
+        subtitle = 'Your supervisor approved — you can now start your internship';
         break;
       case PlacementStatus.rejected:
         color = Colors.red;
         icon = Icons.cancel;
-        title = 'Rejected';
-        subtitle = placement.adminNotes ?? 'Please contact admin for details';
+        title = 'Revision Required';
+        // Show feedback summary in subtitle if short enough,
+        // otherwise direct them to the feedback card above
+        subtitle = (placement.supervisorFeedback != null &&
+                placement.supervisorFeedback!.length <= 80)
+            ? placement.supervisorFeedback!
+            : 'See feedback below and upload a revised letter';
         break;
       case PlacementStatus.active:
         color = Colors.blue;
         icon = Icons.work;
         title = 'Active';
-        subtitle = 'Week ${placement.weeksCompleted} of ${placement.totalWeeks}';
+        subtitle =
+            'Week ${placement.weeksCompleted} of ${placement.totalWeeks}';
         break;
       case PlacementStatus.completed:
         color = Colors.green;
@@ -337,7 +409,7 @@ class MyPlacementStatusPage extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(color: Colors.grey[700]),
+                  style: TextStyle(color: Colors.grey[700], height: 1.4),
                 ),
               ],
             ),
@@ -365,7 +437,6 @@ class _AcceptanceLetterViewer extends StatelessWidget {
 
   Future<void> _openFile() async {
     if (fileUrl == null || fileUrl!.isEmpty) return;
-
     final uri = Uri.parse(fileUrl!);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -374,7 +445,6 @@ class _AcceptanceLetterViewer extends StatelessWidget {
 
   Future<void> _copyUrl(BuildContext context) async {
     if (fileUrl == null || fileUrl!.isEmpty) return;
-
     await Clipboard.setData(ClipboardData(text: fileUrl!));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -398,12 +468,10 @@ class _AcceptanceLetterViewer extends StatelessWidget {
           children: [
             Text(
               'Acceptance Letter',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Divider(height: 24),
-            
             if (fileUrl == null || fileUrl!.isEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -414,45 +482,51 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber, color: Colors.orange.shade700),
+                    Icon(Icons.warning_amber,
+                        color: Colors.orange.shade700),
                     const SizedBox(width: 12),
                     const Expanded(
-                      child: Text('No acceptance letter uploaded'),
-                    ),
+                        child: Text('No acceptance letter uploaded')),
                   ],
                 ),
               ),
             ] else ...[
-              // File type detection
               Builder(
                 builder: (context) {
-                  final isImage = fileUrl!.toLowerCase().contains('.jpg') ||
-                      fileUrl!.toLowerCase().contains('.jpeg') ||
-                      fileUrl!.toLowerCase().contains('.png');
-                  final isPdf = fileUrl!.toLowerCase().contains('.pdf');
+                  final isImage =
+                      fileUrl!.toLowerCase().contains('.jpg') ||
+                          fileUrl!.toLowerCase().contains('.jpeg') ||
+                          fileUrl!.toLowerCase().contains('.png');
+                  final isPdf =
+                      fileUrl!.toLowerCase().contains('.pdf');
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // File Info
                       Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: isPdf ? Colors.red.shade50 : Colors.blue.shade50,
+                              color: isPdf
+                                  ? Colors.red.shade50
+                                  : Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              isPdf ? Icons.picture_as_pdf : Icons.image,
-                              color: isPdf ? Colors.red : Colors.blue,
+                              isPdf
+                                  ? Icons.picture_as_pdf
+                                  : Icons.image,
+                              color:
+                                  isPdf ? Colors.red : Colors.blue,
                               size: 32,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   fileName,
@@ -465,7 +539,9 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  isPdf ? 'PDF Document' : 'Image File',
+                                  isPdf
+                                      ? 'PDF Document'
+                                      : 'Image File',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
@@ -477,15 +553,15 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Action Buttons
                       Row(
                         children: [
                           Expanded(
                             child: FilledButton.icon(
                               onPressed: _openFile,
-                              icon: const Icon(Icons.open_in_new, size: 18),
-                              label: Text(isPdf ? 'Open PDF' : 'View Image'),
+                              icon: const Icon(Icons.open_in_new,
+                                  size: 18),
+                              label: Text(
+                                  isPdf ? 'Open PDF' : 'View Image'),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -498,19 +574,14 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                           ),
                         ],
                       ),
-
-                      // Image Preview
                       if (isImage) ...[
                         const SizedBox(height: 16),
                         const Divider(),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Preview',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
+                        const Text('Preview',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14)),
                         const SizedBox(height: 8),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -519,33 +590,30 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                             height: 200,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(8),
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 200,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.broken_image, size: 48),
+                                    SizedBox(height: 8),
+                                    Text('Failed to load image'),
+                                  ],
                                 ),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.broken_image, size: 48),
-                                      SizedBox(height: 8),
-                                      Text('Failed to load image'),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
+                              ),
+                            ),
+                            loadingBuilder:
+                                (_, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(
                                 height: 200,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                                color: Colors.grey.shade200,
                                 child: const Center(
                                   child: CircularProgressIndicator(),
                                 ),
@@ -553,7 +621,6 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                             },
                           ),
                         ),
-                        const SizedBox(height: 8),
                         Center(
                           child: TextButton.icon(
                             onPressed: () {
@@ -565,15 +632,18 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                                     children: [
                                       Center(
                                         child: InteractiveViewer(
-                                          child: Image.network(fileUrl!),
+                                          child:
+                                              Image.network(fileUrl!),
                                         ),
                                       ),
                                       Positioned(
                                         top: 10,
                                         right: 10,
                                         child: IconButton(
-                                          icon: const Icon(Icons.close, color: Colors.white),
-                                          onPressed: () => Navigator.pop(context),
+                                          icon: const Icon(Icons.close,
+                                              color: Colors.white),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                         ),
                                       ),
                                     ],
@@ -591,13 +661,12 @@ class _AcceptanceLetterViewer extends StatelessWidget {
                 },
               ),
             ],
-            
-            // Upload Date
             if (uploadedAt != null) ...[
               const SizedBox(height: 16),
               Text(
                 'Uploaded: ${DateFormat('MMM dd, yyyy • HH:mm').format(uploadedAt!)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style:
+                    TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ],
@@ -631,9 +700,7 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );

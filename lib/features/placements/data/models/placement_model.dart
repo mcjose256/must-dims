@@ -4,15 +4,21 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'placement_model.freezed.dart';
 part 'placement_model.g.dart';
 
+// ============================================================================
+// PLACEMENT STATUS
+// Reflects the real MUST workflow:
+//   Student uploads letter → University Supervisor reviews → Internship begins
+// ============================================================================
+
 enum PlacementStatus {
-  pending,           // Acceptance letter uploaded, awaiting admin approval
-  approved,          // Admin approved, ready to start
-  rejected,          // Admin rejected the acceptance letter
-  active,            // Internship in progress
-  completed,         // Successfully completed
-  cancelled,         // Cancelled before completion
-  terminated,        // Ended early
-  extended,          // Duration extended
+  pendingSupervisorReview, // Letter uploaded, awaiting university supervisor approval
+  approved,                // Supervisor approved — student can begin internship
+  rejected,                // Supervisor rejected — student must resubmit with fixes
+  active,                  // Internship in progress
+  completed,               // Successfully completed
+  cancelled,               // Cancelled before completion
+  terminated,              // Ended early
+  extended,                // Duration extended
 }
 
 @freezed
@@ -21,41 +27,45 @@ class PlacementModel with _$PlacementModel {
     required String id,
     required String studentId,
     required String companyId,
-    String? universitySupervisorId, // Linked from student's currentSupervisorId
-    
+
+    // University supervisor (auto-assigned via algorithm)
+    String? universitySupervisorId,
+
     // Company supervisor details (from acceptance letter)
     String? companySupervisorName,
     String? companySupervisorEmail,
     String? companySupervisorPhone,
-    String? companySupervisorId, // Will be set when company supervisor creates account
-    
+    String? companySupervisorId,
+
     // Acceptance letter
     String? acceptanceLetterUrl,
     String? acceptanceLetterFileName,
     DateTime? letterUploadedAt,
-    
-    // Status & approval
-    @Default(PlacementStatus.pending) PlacementStatus status,
-    String? adminNotes, // Rejection reason or other notes
-    DateTime? approvedAt,
-    String? approvedByAdminId,
-    DateTime? rejectedAt,
-    String? rejectedByAdminId,
-    
-    // Internship timeline
+
+    // ── Approval (now supervisor-driven, not admin) ──────────────────────────
+    @Default(PlacementStatus.pendingSupervisorReview) PlacementStatus status,
+
+    /// Feedback left by the university supervisor on rejection.
+    /// Student sees this so they know what to fix before resubmitting.
+    String? supervisorFeedback,
+
+    DateTime? supervisorApprovedAt,
+    DateTime? supervisorRejectedAt,
+
+    // ── Internship timeline ──────────────────────────────────────────────────
     required String academicYear,
     DateTime? startDate,
     DateTime? endDate,
     DateTime? actualEndDate,
-    @Default(12) int totalWeeks, // Default 12 weeks
+    @Default(12) int totalWeeks,
     @Default(0) int weeksCompleted,
     @Default(0.0) double progressPercentage,
-    
-    // Additional info
-    String? studentNotes, // Why they chose this company
+
+    // ── Additional info ──────────────────────────────────────────────────────
+    String? studentNotes,
     String? remarks,
-    
-    // Timestamps
+
+    // ── Timestamps ───────────────────────────────────────────────────────────
     DateTime? createdAt,
     DateTime? updatedAt,
   }) = _PlacementModel;
@@ -63,15 +73,14 @@ class PlacementModel with _$PlacementModel {
   factory PlacementModel.fromJson(Map<String, dynamic> json) =>
       _$PlacementModelFromJson(json);
 
-  // Firestore converters
+  // ── Firestore converters ─────────────────────────────────────────────────
+
   static PlacementModel fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
     SnapshotOptions? options,
   ) {
     final data = doc.data();
-    if (data == null) {
-      throw Exception('Document data is null');
-    }
+    if (data == null) throw Exception('Document data is null');
 
     DateTime? parseDate(dynamic value) {
       if (value == null) return null;
@@ -81,12 +90,21 @@ class PlacementModel with _$PlacementModel {
       return null;
     }
 
+    // ── Legacy migration: map old 'pending' status to new name ──────────────
+    final rawStatus = data['status'] as String?;
+    final migratedStatus =
+        rawStatus == 'pending' ? 'pendingSupervisorReview' : rawStatus;
+
     return PlacementModel.fromJson({
       ...data,
       'id': doc.id,
-      'letterUploadedAt': parseDate(data['letterUploadedAt'])?.toIso8601String(),
-      'approvedAt': parseDate(data['approvedAt'])?.toIso8601String(),
-      'rejectedAt': parseDate(data['rejectedAt'])?.toIso8601String(),
+      'status': migratedStatus,
+      'letterUploadedAt':
+          parseDate(data['letterUploadedAt'])?.toIso8601String(),
+      'supervisorApprovedAt':
+          parseDate(data['supervisorApprovedAt'])?.toIso8601String(),
+      'supervisorRejectedAt':
+          parseDate(data['supervisorRejectedAt'])?.toIso8601String(),
       'startDate': parseDate(data['startDate'])?.toIso8601String(),
       'endDate': parseDate(data['endDate'])?.toIso8601String(),
       'actualEndDate': parseDate(data['actualEndDate'])?.toIso8601String(),
@@ -100,35 +118,21 @@ class PlacementModel with _$PlacementModel {
     SetOptions? options,
   ) {
     final json = placement.toJson();
-    json.remove('id'); // Don't store ID in document
+    json.remove('id');
 
-    // Convert DateTimes to Timestamps
-    if (placement.letterUploadedAt != null) {
-      json['letterUploadedAt'] = Timestamp.fromDate(placement.letterUploadedAt!);
-    }
-    if (placement.approvedAt != null) {
-      json['approvedAt'] = Timestamp.fromDate(placement.approvedAt!);
-    }
-    if (placement.rejectedAt != null) {
-      json['rejectedAt'] = Timestamp.fromDate(placement.rejectedAt!);
-    }
-    if (placement.startDate != null) {
-      json['startDate'] = Timestamp.fromDate(placement.startDate!);
-    }
-    if (placement.endDate != null) {
-      json['endDate'] = Timestamp.fromDate(placement.endDate!);
-    }
-    if (placement.actualEndDate != null) {
-      json['actualEndDate'] = Timestamp.fromDate(placement.actualEndDate!);
-    }
-    if (placement.createdAt != null) {
-      json['createdAt'] = Timestamp.fromDate(placement.createdAt!);
-    }
-    if (placement.updatedAt != null) {
-      json['updatedAt'] = Timestamp.fromDate(placement.updatedAt!);
+    void setTimestamp(String key, DateTime? dt) {
+      if (dt != null) json[key] = Timestamp.fromDate(dt);
     }
 
-    // Convert enum to string
+    setTimestamp('letterUploadedAt', placement.letterUploadedAt);
+    setTimestamp('supervisorApprovedAt', placement.supervisorApprovedAt);
+    setTimestamp('supervisorRejectedAt', placement.supervisorRejectedAt);
+    setTimestamp('startDate', placement.startDate);
+    setTimestamp('endDate', placement.endDate);
+    setTimestamp('actualEndDate', placement.actualEndDate);
+    setTimestamp('createdAt', placement.createdAt);
+    setTimestamp('updatedAt', placement.updatedAt);
+
     json['status'] = placement.status.name;
 
     return json;

@@ -53,6 +53,8 @@ Map<String, dynamic> _$$StudentProfileModelImplToJson(
 const _$StudentInternshipStatusEnumMap = {
   StudentInternshipStatus.notStarted: 'notStarted',
   StudentInternshipStatus.awaitingApproval: 'awaitingApproval',
+  StudentInternshipStatus.approved: 'approved',
+  StudentInternshipStatus.rejected: 'rejected',
   StudentInternshipStatus.inProgress: 'inProgress',
   StudentInternshipStatus.completed: 'completed',
   StudentInternshipStatus.deferred: 'deferred',

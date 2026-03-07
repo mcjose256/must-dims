@@ -31,15 +31,11 @@ class MyInternshipPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Academic Supervisor Section
               _buildAcademicSupervisorCard(context, supervisorAsync, theme),
               const SizedBox(height: 16),
-
-              // Placement Information
               placementAsync.when(
                 data: (placement) {
                   if (placement == null) {
-                    // ✅ Bug 8 Fix: Show actionable prompt instead of dead-end card
                     return _buildNoPlacementCard(context, theme);
                   }
                   return _buildPlacementContent(
@@ -51,8 +47,7 @@ class MyInternshipPage extends ConsumerWidget {
                     child: CircularProgressIndicator(),
                   ),
                 ),
-                error: (error, _) =>
-                    _buildErrorCard(context, ref, error),
+                error: (error, _) => _buildErrorCard(context, ref, error),
               ),
             ],
           ),
@@ -183,8 +178,7 @@ class MyInternshipPage extends ConsumerWidget {
           Expanded(
             child: Text(
               'Error loading supervisor information',
-              style:
-                  TextStyle(fontSize: 13, color: Colors.red.shade700),
+              style: TextStyle(fontSize: 13, color: Colors.red.shade700),
             ),
           ),
         ],
@@ -194,7 +188,6 @@ class MyInternshipPage extends ConsumerWidget {
 
   // ── No placement card ────────────────────────────────────────────────────
 
-  /// ✅ Bug 8 Fix: Shows an actionable card instead of a dead-end message
   Widget _buildNoPlacementCard(BuildContext context, ThemeData theme) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -219,7 +212,8 @@ class MyInternshipPage extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'You haven\'t started the internship process yet. Upload your company acceptance letter to get started.',
+              'You haven\'t started the internship process yet. Upload your '
+              'company acceptance letter to get started.',
               style: TextStyle(
                   fontSize: 13,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -257,14 +251,13 @@ class MyInternshipPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Status badge
         _StatusBadge(status: placement.status),
         const SizedBox(height: 16),
 
         // Company info card
         Card(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -307,8 +300,8 @@ class MyInternshipPage extends ConsumerWidget {
 
         // Company Supervisor card
         Card(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -342,7 +335,50 @@ class MyInternshipPage extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
 
-        // Timeline card (only when relevant)
+        // Supervisor feedback card — only shown when rejected
+        if (placement.status == PlacementStatus.rejected &&
+            placement.supervisorFeedback != null &&
+            placement.supervisorFeedback!.isNotEmpty) ...[
+          Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: Colors.red.shade200),
+            ),
+            color: Colors.red.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.feedback_outlined,
+                          color: Colors.red.shade600, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Supervisor Feedback',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    placement.supervisorFeedback!,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.red.shade800,
+                        height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Timeline card
         if (placement.status == PlacementStatus.approved ||
             placement.status == PlacementStatus.active ||
             placement.status == PlacementStatus.completed) ...[
@@ -365,16 +401,14 @@ class MyInternshipPage extends ConsumerWidget {
                         label: 'Start Date',
                         value: DateFormat('MMM dd, yyyy')
                             .format(placement.startDate!)),
-                  if (placement.startDate != null)
-                    const SizedBox(height: 12),
+                  if (placement.startDate != null) const SizedBox(height: 12),
                   if (placement.endDate != null)
                     _InfoRow(
                         icon: Icons.stop_circle_outlined,
                         label: 'End Date',
                         value: DateFormat('MMM dd, yyyy')
                             .format(placement.endDate!)),
-                  if (placement.endDate != null)
-                    const SizedBox(height: 12),
+                  if (placement.endDate != null) const SizedBox(height: 12),
                   _InfoRow(
                       icon: Icons.timelapse_outlined,
                       label: 'Duration',
@@ -388,8 +422,8 @@ class MyInternshipPage extends ConsumerWidget {
                       children: [
                         Text(
                           '${placement.weeksCompleted} / ${placement.totalWeeks} weeks',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           '${placement.progressPercentage.toStringAsFixed(0)}%',
@@ -404,8 +438,7 @@ class MyInternshipPage extends ConsumerWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
-                        value: placement.weeksCompleted /
-                            placement.totalWeeks,
+                        value: placement.weeksCompleted / placement.totalWeeks,
                         minHeight: 10,
                         backgroundColor: Theme.of(context)
                             .colorScheme
@@ -433,8 +466,8 @@ class MyInternshipPage extends ConsumerWidget {
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.picture_as_pdf,
-                    color: Colors.red.shade600),
+                child:
+                    Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
               ),
               title: const Text('Acceptance Letter',
                   style: TextStyle(fontWeight: FontWeight.w600)),
@@ -543,9 +576,10 @@ class _StatusBadge extends StatelessWidget {
     String label;
 
     switch (status) {
-      case PlacementStatus.pending:
+      // ── New status name ────────────────────────────────────────────────
+      case PlacementStatus.pendingSupervisorReview:
         color = Colors.orange;
-        label = 'PENDING REVIEW';
+        label = 'AWAITING SUPERVISOR REVIEW';
         break;
       case PlacementStatus.approved:
         color = Colors.green;
@@ -553,7 +587,7 @@ class _StatusBadge extends StatelessWidget {
         break;
       case PlacementStatus.rejected:
         color = Colors.red;
-        label = 'REJECTED';
+        label = 'NEEDS REVISION';
         break;
       case PlacementStatus.active:
         color = Colors.blue;
@@ -637,7 +671,8 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon,
-            size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -646,7 +681,8 @@ class _InfoRow extends StatelessWidget {
               Text(label,
                   style: TextStyle(
                       fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      color:
+                          Theme.of(context).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 2),
               Text(value,
                   style: const TextStyle(
@@ -704,8 +740,7 @@ class _CopyableRow extends StatelessWidget {
                       style: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
-                          color:
-                              Theme.of(context).colorScheme.primary)),
+                          color: Theme.of(context).colorScheme.primary)),
                 ],
               ),
             ),
