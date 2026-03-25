@@ -502,26 +502,29 @@ class _StatsSection extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth >= 1100
+        final spacing = 14.0;
+        final columns = constraints.maxWidth >= 1100
             ? 3
             : constraints.maxWidth >= 700
                 ? 2
                 : 1;
+        final tileWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - (spacing * (columns - 1))) / columns;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 14,
-            childAspectRatio: crossAxisCount == 1 ? 2.2 : 1.6,
-          ),
-          itemBuilder: (context, index) => _AnimatedStatCard(
-            item: items[index],
-            delay: index * 80,
-          ),
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (var index = 0; index < items.length; index++)
+              SizedBox(
+                width: tileWidth,
+                child: _AnimatedStatCard(
+                  item: items[index],
+                  delay: index * 80,
+                ),
+              ),
+          ],
         );
       },
     );
@@ -734,49 +737,57 @@ class _AnimatedStatCard extends StatelessWidget {
         );
       },
       child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: item.color.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 180),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: item.color.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(item.icon, color: item.color),
                     ),
-                    child: Icon(item.icon, color: item.color),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: item.color,
-                      shape: BoxShape.circle,
+                    const Spacer(),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: item.color,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                item.value,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: item.color,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  item.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: item.color,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

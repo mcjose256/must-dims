@@ -105,44 +105,55 @@ class _LandingPageState extends ConsumerState<LandingPage> {
               child: Row(
                 children: [
                   // Logo + wordmark
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/icons/must logo.png',
-                        width: 36,
-                        height: 36,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'MUST',
-                        style: TextStyle(
-                          color: _mustGreen,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          letterSpacing: 1.5,
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          'assets/icons/must logo.png',
+                          width: 36,
+                          height: 36,
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _mustGold,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'DIMS',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            letterSpacing: 1,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              const Text(
+                                'MUST',
+                                style: TextStyle(
+                                  color: _mustGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _mustGold,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'DIMS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   if (_currentPage < _totalSlides - 1)
                     TextButton(
                       onPressed: () => _pageController.animateToPage(
@@ -205,46 +216,53 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                   const SizedBox(height: 16),
 
                   // Navigation buttons
-                  Row(
-                    children: [
-                      if (_currentPage > 0)
-                        IconButton(
-                          onPressed: _prevPage,
-                          icon: const Icon(
-                              Icons.arrow_back_ios_rounded),
-                          color: _mustGreen,
-                        )
-                      else
-                        const SizedBox(width: 48),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 380;
 
-                      const Spacer(),
+                      if (_currentPage < _totalSlides - 1) {
+                        return Row(
+                          children: [
+                            if (_currentPage > 0)
+                              IconButton(
+                                onPressed: _prevPage,
+                                icon: const Icon(
+                                    Icons.arrow_back_ios_rounded),
+                                color: _mustGreen,
+                              )
+                            else
+                              const SizedBox(width: 48),
+                            const Spacer(),
+                            FilledButton(
+                              onPressed: _nextPage,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _mustGreen,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 32, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Next',
+                                      style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.arrow_forward_ios_rounded,
+                                      size: 14),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }
 
-                      if (_currentPage < _totalSlides - 1)
-                        FilledButton(
-                          onPressed: _nextPage,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _mustGreen,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(12)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('Next',
-                                  style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold)),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward_ios_rounded,
-                                  size: 14),
-                            ],
-                          ),
-                        )
-                      else
-                        Row(
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             OutlinedButton(
                               onPressed: () => context.go('/login'),
@@ -263,7 +281,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14)),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(height: 10),
                             FilledButton(
                               onPressed: () => context.go('/register'),
                               style: FilledButton.styleFrom(
@@ -281,8 +299,52 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                       fontSize: 14)),
                             ),
                           ],
-                        ),
-                    ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => context.go('/login'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _mustGreen,
+                                side: const BorderSide(
+                                    color: _mustGreen, width: 1.5),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Log In',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => context.go('/register'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _mustGold,
+                                foregroundColor: Colors.black87,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Register',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14)),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -496,22 +558,30 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      // FIX: increased from 1.3 to 1.45 — prevents overflow
-      childAspectRatio: 1.45,
-      children: items
-          .map((s) => _StatCard(
-                icon: s.icon,
-                iconColor: s.iconColor,
-                value: s.value,
-                label: s.label,
-              ))
-          .toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 12.0;
+        final columns = constraints.maxWidth >= 640 ? 2 : 1;
+        final tileWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - spacing) / 2;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: items
+              .map((s) => SizedBox(
+                    width: tileWidth,
+                    child: _StatCard(
+                      icon: s.icon,
+                      iconColor: s.iconColor,
+                      value: s.value,
+                      label: s.label,
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }
@@ -827,6 +897,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(minHeight: 148),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
