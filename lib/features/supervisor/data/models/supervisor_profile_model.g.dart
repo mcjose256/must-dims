@@ -17,7 +17,7 @@ _$SupervisorProfileModelImpl _$$SupervisorProfileModelImplFromJson(
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      maxStudents: (json['maxStudents'] as num?)?.toInt() ?? 12,
+      maxStudents: (json['maxStudents'] as num?)?.toInt() ?? 15,
       currentLoad: (json['currentLoad'] as num?)?.toInt() ?? 0,
       isAvailable: json['isAvailable'] as bool? ?? true,
       phoneNumber: json['phoneNumber'] as String?,

@@ -94,7 +94,7 @@ class _StartInternshipPageState extends ConsumerState<StartInternshipPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Once started, you can submit daily logbook entries and weekly summaries. Are you ready to begin?',
+                'Once started, record daily work and submit a weekly summary for review. Are you ready to begin?',
                 style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -269,7 +269,7 @@ class _StartInternshipPageState extends ConsumerState<StartInternshipPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Your placement must be approved by admin before you can start your internship.',
+              'Your placement must be approved before you can start your internship.',
               style: TextStyle(color: Colors.grey.shade600, height: 1.5),
               textAlign: TextAlign.center,
             ),
@@ -376,17 +376,17 @@ class _StartInternshipPageState extends ConsumerState<StartInternshipPage> {
           const SizedBox(height: 16),
 
           _ExpectationTile(
-            icon: Icons.event_note_outlined,
+            icon: Icons.edit_note_outlined,
             color: Colors.blue,
-            title: 'Daily Logbook Entries',
-            description: 'Record your daily tasks, activities, and learnings',
+            title: 'Daily Logbook',
+            description: 'Record each workday',
           ),
           _ExpectationTile(
             icon: Icons.summarize_outlined,
             color: Colors.purple,
-            title: 'Weekly Summaries',
+            title: 'Weekly Logbook',
             description:
-                'Compile weekly reports that your supervisor will endorse',
+                'Generate the weekly summary from your daily logbook',
           ),
           _ExpectationTile(
             icon: Icons.supervisor_account_outlined,
@@ -419,8 +419,8 @@ class _StartInternshipPageState extends ConsumerState<StartInternshipPage> {
             ),
             child: Column(
               children: [
-                _TermRow('Submit daily logbook entries consistently'),
-                _TermRow('Complete weekly summaries on time'),
+                _TermRow('Keep your daily logbook up to date'),
+                _TermRow('Submit the weekly logbook on time'),
                 _TermRow('Maintain professional conduct at all times'),
                 _TermRow('Adhere to company policies and regulations'),
                 _TermRow(

@@ -25,7 +25,7 @@ final companySupervisorStudentsProvider = StreamProvider<List<Map<String, dynami
   return FirebaseFirestore.instance
       .collection('placements')
       .where('companySupervisorId', isEqualTo: user.uid)
-      .where('status', whereIn: ['active', 'approved'])
+      .where('status', whereIn: ['active', 'approved', 'completed', 'extended'])
       .snapshots()
       .asyncMap((snapshot) async {
         final List<Map<String, dynamic>> students = [];

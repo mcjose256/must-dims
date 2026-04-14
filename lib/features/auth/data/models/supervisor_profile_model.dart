@@ -12,7 +12,7 @@ class SupervisorProfileModel with _$SupervisorProfileModel {
     @Default('No email') String email,
     @Default('No department') String department,
     @Default([]) List<String> programSpecialties,
-    @Default(12) int maxStudents,
+    @Default(15) int maxStudents,
     @Default(0) int currentLoad,
     @Default(true) bool isAvailable,
     String? phoneNumber,

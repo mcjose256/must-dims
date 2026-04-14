@@ -165,7 +165,11 @@ class StudentOverviewPage extends ConsumerWidget {
               data: (profile) {
                 final status = profile?.internshipStatus ??
                     StudentInternshipStatus.notStarted;
-                final progress = profile?.progressPercentage ?? 0.0;
+                final placement = placementAsync.value;
+                final placementProgress =
+                    placement != null ? placement.progressPercentage * 100 : null;
+                final progress =
+                    placementProgress ?? profile?.progressPercentage ?? 0.0;
 
                 if (status == StudentInternshipStatus.notStarted) {
                   return _buildNotStartedContent(theme);
@@ -266,8 +270,12 @@ class StudentOverviewPage extends ConsumerWidget {
       data: (profile) {
         final status =
             profile?.internshipStatus ?? StudentInternshipStatus.notStarted;
+        final placement = placementAsync.value;
+        final effectiveStatus = placement?.status == PlacementStatus.completed
+            ? StudentInternshipStatus.completed
+            : status;
 
-        switch (status) {
+        switch (effectiveStatus) {
           // ── Stage 1: Not started — nudge to upload ──────────────────────
           case StudentInternshipStatus.notStarted:
             return _QuickActionsGrid(actions: [
@@ -329,16 +337,23 @@ class StudentOverviewPage extends ConsumerWidget {
             return _QuickActionsGrid(actions: [
               _QuickAction(
                 icon: Icons.add_circle_outline,
-                title: 'New Entry',
-                subtitle: 'Add daily log',
+                title: 'Daily Log',
+                subtitle: 'Add today',
                 color: Colors.blue,
-                onTap: () => context.go('/student/submit-logbook'),
+                onTap: () => context.push('/student/submit-daily-logbook'),
+              ),
+              _QuickAction(
+                icon: Icons.summarize_outlined,
+                title: 'Weekly Log',
+                subtitle: 'Submit week',
+                color: Colors.green,
+                onTap: () => context.push('/student/submit-logbook'),
               ),
               _QuickAction(
                 icon: Icons.book_outlined,
                 title: 'Logbook',
                 subtitle: 'View entries',
-                color: Colors.green,
+                color: Colors.teal,
                 onTap: () =>
                     ref.read(selectedStudentTabProvider.notifier).state = 1,
               ),
@@ -346,17 +361,9 @@ class StudentOverviewPage extends ConsumerWidget {
                 icon: Icons.business_outlined,
                 title: 'Internship',
                 subtitle: 'View details',
-                color: Colors.teal,
+                color: Colors.orange,
                 onTap: () =>
                     ref.read(selectedStudentTabProvider.notifier).state = 2,
-              ),
-              _QuickAction(
-                icon: Icons.person_outlined,
-                title: 'Profile',
-                subtitle: 'Edit info',
-                color: Colors.purple,
-                onTap: () =>
-                    ref.read(selectedStudentTabProvider.notifier).state = 3,
               ),
             ]);
 
@@ -365,19 +372,17 @@ class StudentOverviewPage extends ConsumerWidget {
             return _QuickActionsGrid(actions: [
               _QuickAction(
                 icon: Icons.book_outlined,
-                title: 'Logbook',
+                title: 'Weekly Logbook',
                 subtitle: 'View all',
                 color: Colors.green,
-                onTap: () =>
-                    ref.read(selectedStudentTabProvider.notifier).state = 1,
+                onTap: () => context.push('/student/logbook/weekly'),
               ),
               _QuickAction(
                 icon: Icons.assessment_outlined,
                 title: 'Evaluation',
                 subtitle: 'View results',
                 color: Colors.orange,
-                onTap: () =>
-                    ref.read(selectedStudentTabProvider.notifier).state = 2,
+                onTap: () => context.push('/student/assessment'),
               ),
               _QuickAction(
                 icon: Icons.person_outlined,

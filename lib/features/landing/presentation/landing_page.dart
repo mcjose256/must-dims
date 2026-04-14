@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 const _mustGreen = Color(0xFF1B5E20);
 const _mustGreenLight = Color(0xFF2E7D32);
 const _mustGold = Color(0xFFF9A825);
+const _slideLabels = ['Welcome', 'Stories', 'Requirements'];
 
 // ============================================================================
 // FIRESTORE PROVIDERS
@@ -25,10 +26,25 @@ final successStoriesProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
       .collection('success_stories')
-      .where('isVisible', isEqualTo: true)
-      .orderBy('order')
       .snapshots()
-      .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+      .map((snapshot) {
+    final stories = snapshot.docs
+        .map((doc) => {...doc.data(), 'id': doc.id})
+        .where((story) => story['isVisible'] != false)
+        .toList();
+
+    stories.sort((a, b) {
+      final aOrder = (a['order'] as num?)?.toInt() ?? 0;
+      final bOrder = (b['order'] as num?)?.toInt() ?? 0;
+      if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+
+      final aName = (a['name'] ?? '').toString().toLowerCase();
+      final bName = (b['name'] ?? '').toString().toLowerCase();
+      return aName.compareTo(bName);
+    });
+
+    return stories;
+  });
 });
 
 final internshipRequirementsProvider =
@@ -104,53 +120,38 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                   horizontal: 20, vertical: 10),
               child: Row(
                 children: [
-                  // Logo + wordmark
                   Expanded(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/icons/must logo.png',
-                          width: 36,
-                          height: 36,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Container(
+                        key: ValueKey<int>(_currentPage),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: [
-                              const Text(
-                                'MUST',
-                                style: TextStyle(
-                                  color: _mustGreen,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _mustGold,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'DIMS',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        decoration: BoxDecoration(
+                          color: _currentPage == 0
+                              ? Colors.white.withOpacity(0.14)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: _currentPage == 0
+                                ? Colors.white.withOpacity(0.18)
+                                : _mustGreen.withOpacity(0.08),
                           ),
                         ),
-                      ],
+                        child: Text(
+                          _slideLabels[_currentPage],
+                          style: TextStyle(
+                            color: _currentPage == 0
+                                ? Colors.white
+                                : _mustGreen,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -164,7 +165,11 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                       child: Text(
                         'Skip',
                         style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 14),
+                          color: _currentPage == 0
+                              ? Colors.white.withOpacity(0.86)
+                              : Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                 ],
@@ -366,11 +371,13 @@ class _StatItem {
   final Color iconColor;
   final String value;
   final String label;
+  final String? note;
   const _StatItem({
     required this.icon,
     required this.iconColor,
     required this.value,
     required this.label,
+    this.note,
   });
 }
 
@@ -384,26 +391,97 @@ class _StatsSlide extends ConsumerWidget {
       iconColor: _mustGreen,
       value: '500+',
       label: 'Students Placed',
+      note: 'Students successfully attached to host organisations.',
     ),
     _StatItem(
       icon: Icons.business_rounded,
       iconColor: Colors.blue,
       value: '120+',
       label: 'Partner Companies',
+      note: 'Approved companies available for placement and supervision.',
     ),
     _StatItem(
       icon: Icons.verified_rounded,
       iconColor: Colors.green,
       value: '94%',
       label: 'Completion Rate',
+      note: 'Internships completed with the required logbook cycle.',
     ),
     _StatItem(
       icon: Icons.calendar_month_rounded,
       iconColor: _mustGold,
       value: '12',
       label: 'Weeks Duration',
+      note: 'Standard internship duration tracked in the platform.',
     ),
   ];
+
+  List<_StatItem> _buildStats(List<Map<String, dynamic>> stats) {
+    if (stats.isEmpty) return _fallback;
+
+    return List.generate(stats.length, (index) {
+      final stat = stats[index];
+      final label = (stat['label'] ??
+              stat['title'] ??
+              stat['name'] ??
+              'Metric ${index + 1}')
+          .toString();
+      final value =
+          (stat['value'] ?? stat['count'] ?? stat['total'] ?? '--').toString();
+      final note = (stat['description'] ?? stat['subtitle'] ?? stat['note'])
+          ?.toString();
+      final appearance = _statAppearanceForLabel(label, index: index);
+
+      return _StatItem(
+        icon: appearance.icon,
+        iconColor: appearance.color,
+        value: value,
+        label: label,
+        note: note == null || note.trim().isEmpty ? null : note.trim(),
+      );
+    });
+  }
+
+  _StatAppearance _statAppearanceForLabel(String label, {required int index}) {
+    final normalized = label.toLowerCase();
+
+    if (normalized.contains('student')) {
+      return const _StatAppearance(Icons.school_rounded, _mustGreen);
+    }
+    if (normalized.contains('company') || normalized.contains('partner')) {
+      return const _StatAppearance(Icons.business_rounded, Colors.blue);
+    }
+    if (normalized.contains('supervisor')) {
+      return const _StatAppearance(Icons.groups_rounded, Colors.indigo);
+    }
+    if (normalized.contains('placement')) {
+      return const _StatAppearance(Icons.work_history_rounded, Colors.teal);
+    }
+    if (normalized.contains('completion') ||
+        normalized.contains('approved') ||
+        normalized.contains('success')) {
+      return const _StatAppearance(Icons.verified_rounded, Colors.green);
+    }
+    if (normalized.contains('week') ||
+        normalized.contains('duration') ||
+        normalized.contains('time')) {
+      return const _StatAppearance(Icons.calendar_month_rounded, _mustGold);
+    }
+    if (normalized.contains('report')) {
+      return const _StatAppearance(Icons.assessment_rounded, Colors.deepOrange);
+    }
+
+    const fallbackPalette = [
+      _StatAppearance(Icons.school_rounded, _mustGreen),
+      _StatAppearance(Icons.business_rounded, Colors.blue),
+      _StatAppearance(Icons.verified_rounded, Colors.green),
+      _StatAppearance(Icons.calendar_month_rounded, _mustGold),
+      _StatAppearance(Icons.groups_rounded, Colors.indigo),
+      _StatAppearance(Icons.work_history_rounded, Colors.teal),
+    ];
+
+    return fallbackPalette[index % fallbackPalette.length];
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -426,7 +504,7 @@ class _StatsSlide extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Logo row in header
+                // Primary brand block
                 Row(
                   children: [
                     Container(
@@ -501,7 +579,7 @@ class _StatsSlide extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Our Impact',
+                  'Platform Snapshot',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -510,36 +588,19 @@ class _StatsSlide extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Numbers that speak for themselves',
+                  'Structured figures from the DIMS platform.',
                   style: TextStyle(
                       color: Colors.grey.shade600, fontSize: 13),
                 ),
                 const SizedBox(height: 20),
 
-                // Always use Flutter icon fallback grid
-                // (Firestore can store value+label; icons stay in code)
                 statsAsync.when(
                   data: (stats) {
-                    // If Firestore has data, override value+label only
-                    final items = stats.isNotEmpty
-                        ? List.generate(
-                            _fallback.length > stats.length
-                                ? stats.length
-                                : _fallback.length,
-                            (i) => _StatItem(
-                              icon: _fallback[i].icon,
-                              iconColor: _fallback[i].iconColor,
-                              value: stats[i]['value'] as String? ??
-                                  _fallback[i].value,
-                              label: stats[i]['label'] as String? ??
-                                  _fallback[i].label,
-                            ),
-                          )
-                        : _fallback;
-                    return _StatsGrid(items: items);
+                    final items = _buildStats(stats);
+                    return _StatsTableCard(items: items);
                   },
-                  loading: () => _StatsGrid(items: _fallback),
-                  error: (_, __) => _StatsGrid(items: _fallback),
+                  loading: () => const _StatsTableCard(items: _fallback),
+                  error: (_, __) => const _StatsTableCard(items: _fallback),
                 ),
 
                 const SizedBox(height: 110), // space for bottom bar
@@ -552,36 +613,154 @@ class _StatsSlide extends ConsumerWidget {
   }
 }
 
-class _StatsGrid extends StatelessWidget {
+class _StatAppearance {
+  final IconData icon;
+  final Color color;
+
+  const _StatAppearance(this.icon, this.color);
+}
+
+class _StatsTableCard extends StatelessWidget {
   final List<_StatItem> items;
-  const _StatsGrid({required this.items});
+
+  const _StatsTableCard({
+    required this.items,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 12.0;
-        final columns = constraints.maxWidth >= 640 ? 2 : 1;
-        final tileWidth = columns == 1
-            ? constraints.maxWidth
-            : (constraints.maxWidth - spacing) / 2;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _mustGreen.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          ...List.generate(items.length, (index) {
+            final item = items[index];
+            return _StatsTableRow(
+              item: item,
+              showDivider: index < items.length - 1,
+              striped: index.isOdd,
+              isFirst: index == 0,
+              isLast: index == items.length - 1,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
 
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: items
-              .map((s) => SizedBox(
-                    width: tileWidth,
-                    child: _StatCard(
-                      icon: s.icon,
-                      iconColor: s.iconColor,
-                      value: s.value,
-                      label: s.label,
-                    ),
-                  ))
-              .toList(),
-        );
-      },
+class _StatsTableRow extends StatelessWidget {
+  final _StatItem item;
+  final bool showDivider;
+  final bool striped;
+  final bool isFirst;
+  final bool isLast;
+
+  const _StatsTableRow({
+    required this.item,
+    required this.showDivider,
+    required this.striped,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: striped ? _mustGreen.withOpacity(0.015) : Colors.white,
+        borderRadius: BorderRadius.vertical(
+          top: isFirst ? const Radius.circular(18) : Radius.zero,
+          bottom: isLast ? const Radius.circular(18) : Radius.zero,
+        ),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: item.iconColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          item.icon,
+                          color: item.iconColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.label,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1F2937),
+                              ),
+                            ),
+                            if (item.note != null) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                item.note!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  item.value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _mustGreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: _mustGreen.withOpacity(0.08),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -683,6 +862,7 @@ class _StoriesSlide extends ConsumerWidget {
                     company: s['company'] as String? ?? '',
                     quote: s['quote'] as String? ?? '',
                     initials: s['initials'] as String? ?? 'S',
+                    imageUrl: s['imageUrl'] as String?,
                   );
                 },
               );
@@ -706,6 +886,7 @@ class _StoriesSlide extends ConsumerWidget {
         company: items[i]['company']!,
         quote: items[i]['quote']!,
         initials: items[i]['initials']!,
+        imageUrl: items[i]['imageUrl'] as String?,
       ),
     );
   }
@@ -881,73 +1062,13 @@ class _RequirementsSlide extends ConsumerWidget {
 // REUSABLE CARD WIDGETS
 // ============================================================================
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  final String label;
-
-  const _StatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 148),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _mustGreen.withOpacity(0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: _mustGreen.withOpacity(0.07),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: iconColor, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: _mustGreen,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StoryCard extends StatelessWidget {
   final String name;
   final String program;
   final String company;
   final String quote;
   final String initials;
+  final String? imageUrl;
 
   const _StoryCard({
     required this.name,
@@ -955,12 +1076,14 @@ class _StoryCard extends StatelessWidget {
     required this.company,
     required this.quote,
     required this.initials,
+    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.trim().isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -976,56 +1099,84 @@ class _StoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.format_quote_rounded,
-              color: _mustGold, size: 32),
-          const SizedBox(height: 8),
-          Text(
-            quote,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-              height: 1.5,
-              fontStyle: FontStyle.italic,
+          if (hasImage)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              child: Image.network(
+                imageUrl!,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: _mustGreen,
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.format_quote_rounded,
+                  color: _mustGold,
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  quote,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    height: 1.5,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 16),
+                Row(
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: _mustGreen,
-                      ),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: _mustGreen,
+                      backgroundImage: hasImage ? NetworkImage(imageUrl!) : null,
+                      child: hasImage
+                          ? null
+                          : Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                     ),
-                    Text(
-                      '$program • $company',
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade600),
-                      overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _mustGreen,
+                            ),
+                          ),
+                          Text(
+                            '$program • $company',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

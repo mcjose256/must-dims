@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/student_controllers.dart';
+import '../../data/models/internship_report_model.dart';
+import '../../../evaluations/data/models/evaluation_model.dart';
 import '../../../placements/data/models/placement_model.dart';
 
 class MyInternshipPage extends ConsumerWidget {
@@ -16,6 +18,8 @@ class MyInternshipPage extends ConsumerWidget {
     final placementAsync = ref.watch(currentPlacementProvider);
     final companyAsync = ref.watch(placementCompanyProvider);
     final supervisorAsync = ref.watch(currentSupervisorProvider);
+    final finalReportAsync = ref.watch(finalInternshipReportProvider);
+    final assessmentsAsync = ref.watch(currentPlacementEvaluationsProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -24,6 +28,8 @@ class MyInternshipPage extends ConsumerWidget {
           ref.invalidate(currentPlacementProvider);
           ref.invalidate(placementCompanyProvider);
           ref.invalidate(currentSupervisorProvider);
+          ref.invalidate(finalInternshipReportProvider);
+          ref.invalidate(currentPlacementEvaluationsProvider);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -39,7 +45,13 @@ class MyInternshipPage extends ConsumerWidget {
                     return _buildNoPlacementCard(context, theme);
                   }
                   return _buildPlacementContent(
-                      context, placement, companyAsync, theme);
+                    context,
+                    placement,
+                    companyAsync,
+                    finalReportAsync,
+                    assessmentsAsync,
+                    theme,
+                  );
                 },
                 loading: () => const Center(
                   child: Padding(
@@ -246,6 +258,8 @@ class MyInternshipPage extends ConsumerWidget {
     BuildContext context,
     PlacementModel placement,
     AsyncValue companyAsync,
+    AsyncValue<InternshipReportModel?> finalReportAsync,
+    AsyncValue<List<EvaluationModel>> assessmentsAsync,
     ThemeData theme,
   ) {
     return Column(
@@ -253,6 +267,12 @@ class MyInternshipPage extends ConsumerWidget {
       children: [
         _StatusBadge(status: placement.status),
         const SizedBox(height: 16),
+
+        if (placement.hasActiveCountdownReminder &&
+            placement.internshipDaysLeft != null) ...[
+          _buildCountdownReminderCard(context, placement, theme),
+          const SizedBox(height: 12),
+        ],
 
         // Company info card
         Card(
@@ -453,6 +473,42 @@ class MyInternshipPage extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
 
+        if (placement.status == PlacementStatus.active ||
+            placement.status == PlacementStatus.completed) ...[
+          finalReportAsync.when(
+            data: (report) => _buildFinalReportCard(
+              context,
+              placement,
+              report,
+              theme,
+            ),
+            loading: () => Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              child: const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (error, _) => Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('Error loading final report: $error'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAssessmentStatusCard(
+            context,
+            placement,
+            assessmentsAsync,
+            theme,
+          ),
+          const SizedBox(height: 12),
+        ],
+
         // Acceptance letter
         if (placement.acceptanceLetterUrl != null)
           Card(
@@ -531,6 +587,427 @@ class MyInternshipPage extends ConsumerWidget {
 
         const SizedBox(height: 20),
       ],
+    );
+  }
+
+  Widget _buildCountdownReminderCard(
+    BuildContext context,
+    PlacementModel placement,
+    ThemeData theme,
+  ) {
+    final daysLeft = placement.internshipDaysLeft!;
+    final daysElapsed = placement.internshipDaysElapsed;
+    final startDate = placement.effectiveReminderStartDate;
+    final endDate = placement.effectiveReminderEndDate;
+
+    final Color accentColor = daysLeft < 0
+        ? Colors.red
+        : daysLeft <= 7
+            ? Colors.deepOrange
+            : theme.colorScheme.primary;
+
+    final String title = daysLeft < 0
+        ? 'Internship timeline overdue'
+        : daysLeft == 0
+            ? 'Today is your final internship day'
+            : '$daysLeft day${daysLeft == 1 ? '' : 's'} left to complete your internship';
+
+    final String subtitle = daysLeft < 0
+        ? 'Your planned internship period has already passed. Update your records and contact your supervisor if your attachment is continuing.'
+        : daysLeft <= 7
+            ? 'You are in the final stretch. Keep your daily and weekly logbooks fully updated.'
+            : 'Keep making steady progress and record your work consistently before the internship period ends.';
+
+    final String badgeText = daysLeft < 0
+        ? '${daysLeft.abs()} day${daysLeft.abs() == 1 ? '' : 's'} overdue'
+        : daysLeft == 0
+            ? 'Ends today'
+            : '$daysLeft day${daysLeft == 1 ? '' : 's'} left';
+
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: accentColor.withOpacity(0.25)),
+      ),
+      color: accentColor.withOpacity(0.06),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    daysLeft <= 7
+                        ? Icons.notifications_active_rounded
+                        : Icons.timer_outlined,
+                    color: accentColor,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Internship Reminder',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (startDate != null)
+              _InfoRow(
+                icon: Icons.play_circle_outline,
+                label: 'Started',
+                value: DateFormat('MMM dd, yyyy').format(startDate),
+              ),
+            if (startDate != null && endDate != null)
+              const SizedBox(height: 12),
+            if (endDate != null)
+              _InfoRow(
+                icon: Icons.event_outlined,
+                label: 'Expected End',
+                value: DateFormat('MMM dd, yyyy').format(endDate),
+              ),
+            if ((startDate != null || endDate != null) && daysElapsed != null)
+              const SizedBox(height: 12),
+            if (daysElapsed != null)
+              _InfoRow(
+                icon: Icons.timelapse_outlined,
+                label: 'Days Elapsed',
+                value: '$daysElapsed day${daysElapsed == 1 ? '' : 's'}',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssessmentStatusCard(
+    BuildContext context,
+    PlacementModel placement,
+    AsyncValue<List<EvaluationModel>> assessmentsAsync,
+    ThemeData theme,
+  ) {
+    return assessmentsAsync.when(
+      data: (evaluations) {
+        EvaluationModel? companyEvaluation;
+        EvaluationModel? universityEvaluation;
+
+        for (final evaluation in evaluations) {
+          if (evaluation.evaluatorType == EvaluationType.companySupervisor &&
+              companyEvaluation == null) {
+            companyEvaluation = evaluation;
+          }
+          if (evaluation.evaluatorType ==
+                  EvaluationType.universitySupervisor &&
+              universityEvaluation == null) {
+            universityEvaluation = evaluation;
+          }
+        }
+
+        final submittedCount = [
+          companyEvaluation,
+          universityEvaluation,
+        ].whereType<EvaluationModel>().length;
+        final isUnlocked = placement.isFinalAssessmentUnlocked;
+        final statusColor = submittedCount == 2
+            ? Colors.green
+            : isUnlocked
+                ? Colors.deepOrange
+                : Colors.blueGrey;
+        final statusLabel = submittedCount == 2
+            ? 'Completed'
+            : isUnlocked
+                ? 'Pending'
+                : 'Not Open Yet';
+        final summaryText = !isUnlocked
+            ? 'Final assessment becomes available after you complete the last week or reach the internship end date.'
+            : submittedCount == 0
+                ? 'Your supervisors have not submitted any final assessment yet.'
+                : submittedCount == 1
+                    ? 'One supervisor assessment has been received. The remaining one is still pending.'
+                    : 'Both final assessments are now available to review.';
+
+        return Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.assessment_outlined,
+                        color: statusColor,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Final Assessment',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  summaryText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _InfoRow(
+                  icon: Icons.verified_outlined,
+                  label: 'Assessments Received',
+                  value: '$submittedCount / 2',
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => context.push('/student/assessment'),
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: const Text('View Assessment Status'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (error, _) => Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('Error loading assessment status: $error'),
+        ),
+      ),
+    );
+  }
+
+  bool _isFinalReportUnlocked(PlacementModel placement) {
+    if (placement.status == PlacementStatus.completed) return true;
+    if (placement.weeksCompleted >= placement.totalWeeks) return true;
+
+    final endDate = placement.endDate;
+    if (endDate == null) return false;
+
+    final today = DateTime.now();
+    final endDay = DateTime(endDate.year, endDate.month, endDate.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    return !todayDay.isBefore(endDay);
+  }
+
+  Widget _buildFinalReportCard(
+    BuildContext context,
+    PlacementModel placement,
+    InternshipReportModel? report,
+    ThemeData theme,
+  ) {
+    final isUnlocked = _isFinalReportUnlocked(placement);
+    final canSubmit = report == null || report.isRejected;
+    final statusColor = report == null
+        ? (isUnlocked ? Colors.green : Colors.orange)
+        : report.isApproved
+            ? Colors.green
+            : report.isRejected
+                ? Colors.red
+                : Colors.orange;
+    final statusText = report == null
+        ? (isUnlocked ? 'Ready for submission' : 'Not open yet')
+        : report.isApproved
+            ? 'Approved'
+            : report.isRejected
+                ? 'Returned'
+                : 'Under review';
+    final buttonLabel = report == null
+        ? 'Submit Report'
+        : report.isRejected
+            ? 'Resubmit Report'
+            : 'View Report';
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.assignment_outlined,
+                    color: theme.colorScheme.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Final Report',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              report?.fileName ??
+                  (isUnlocked
+                      ? 'Upload your final internship report in PDF format.'
+                      : 'Available after the final week or internship end date.'),
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+            if (report?.supervisorFeedback != null &&
+                report!.supervisorFeedback!.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Supervisor Feedback',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(report.supervisorFeedback!),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: (report != null || (canSubmit && isUnlocked))
+                    ? () => context.push('/student/final-report')
+                    : null,
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(buttonLabel),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,123 +1,75 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shimmer/shimmer.dart';
 
-import '../../../student/data/models/student_profile_model.dart';
-import '../../../supervisor/data/models/supervisor_profile_model.dart';
+const int _defaultSupervisorCapacity = 15;
 
-// ── Providers ────────────────────────────────────────────────────────────────
+final allocationStudentsProvider =
+    StreamProvider<List<_AllocationStudentRecord>>((ref) {
+  return FirebaseFirestore.instance.collection('students').snapshots().map((
+    snapshot,
+  ) {
+    final students = <_AllocationStudentRecord>[];
 
-// Provider for unassigned students
-final unassignedStudentsProvider = StreamProvider<List<StudentProfileModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('students')
-      .snapshots()
-      .map((snap) {
-        final list = snap.docs
-            .where((doc) {
-              final data = doc.data();
-              final supervisorId = data['currentSupervisorId'];
-              return supervisorId == null || supervisorId == '';
-            })
-            .map((doc) {
-              try {
-                return StudentProfileModel.fromFirestore(doc, null);
-              } catch (e) {
-                print('Parse error on unassigned student ${doc.id}: $e');
-                return null;
-              }
-            })
-            .whereType<StudentProfileModel>()
-            .toList();
+    for (final doc in snapshot.docs) {
+      try {
+        students.add(_AllocationStudentRecord.fromSnapshot(doc));
+      } catch (error) {
+        debugPrint('Failed to parse student ${doc.id}: $error');
+      }
+    }
 
-        return list;
-      })
-      .handleError((e) {
-        print('Unassigned query error: $e');
-        return <StudentProfileModel>[];
-      });
+    students.sort(
+      (left, right) =>
+          left.fullName.toLowerCase().compareTo(right.fullName.toLowerCase()),
+    );
+    return students;
+  });
 });
 
-// Provider for assigned students
-final assignedStudentsProvider = StreamProvider<List<StudentProfileModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('students')
-      .snapshots()
-      .map((snap) {
-        final list = snap.docs
-            .where((doc) {
-              final data = doc.data();
-              final supervisorId = data['currentSupervisorId'];
-              return supervisorId != null && supervisorId != '';
-            })
-            .map((doc) {
-              try {
-                return StudentProfileModel.fromFirestore(doc, null);
-              } catch (e) {
-                print('Parse error on assigned student ${doc.id}: $e');
-                return null;
-              }
-            })
-            .whereType<StudentProfileModel>()
-            .toList();
-
-        return list;
-      })
-      .handleError((e) {
-        print('Assigned query error: $e');
-        return <StudentProfileModel>[];
-      });
-});
-
-// Provider for total students count
-final totalStudentsProvider = StreamProvider<int>((ref) {
-  return FirebaseFirestore.instance
-      .collection('students')
-      .snapshots()
-      .map((snap) => snap.docs.length)
-      .handleError((e) {
-        print('Total students query error: $e');
-        return 0;
-      });
-});
-
-final availableSupervisorsProvider = StreamProvider<List<SupervisorProfileModel>>((ref) {
+final allocationSupervisorsProvider =
+    StreamProvider<List<_AllocationSupervisorRecord>>((ref) {
   return FirebaseFirestore.instance
       .collection('supervisorProfiles')
       .snapshots()
-      .map((snap) {
-        final list = snap.docs.map((doc) => SupervisorProfileModel.fromFirestore(doc, null)).toList();
-        final available = list.where((sup) {
-          final load = sup.currentLoad ?? 0;
-          final max = sup.maxStudents ?? 12;
-          final isAvailable = sup.isAvailable ?? true;
-          return isAvailable && load < max;
-        }).toList();
+      .map((snapshot) {
+        final supervisors = <_AllocationSupervisorRecord>[];
 
-        return available;
-      })
-      .handleError((e) {
-        print('Supervisors query error: $e');
-        return <SupervisorProfileModel>[];
+        for (final doc in snapshot.docs) {
+          try {
+            supervisors.add(_AllocationSupervisorRecord.fromSnapshot(doc));
+          } catch (error) {
+            debugPrint('Failed to parse supervisor ${doc.id}: $error');
+          }
+        }
+
+        supervisors.sort(
+          (left, right) => left.fullName
+              .toLowerCase()
+              .compareTo(right.fullName.toLowerCase()),
+        );
+        return supervisors;
       });
 });
 
 final lastAssignmentResultProvider = StateProvider<String?>((ref) => null);
 
-// ── Helper Function: Fix Supervisor Loads ───────────────────────────────────
+Future<void> _refreshAllocationData(WidgetRef ref) async {
+  ref.invalidate(allocationStudentsProvider);
+  ref.invalidate(allocationSupervisorsProvider);
+}
 
 Future<void> _fixSupervisorLoads(BuildContext context) async {
   final scaffoldMessenger = ScaffoldMessenger.of(context);
-  
+
   final confirm = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Recalculate Supervisor Loads?'),
       content: const Text(
-        'This will count the actual number of assigned students for each supervisor '
-        'and update their currentLoad field. This fixes any sync issues.',
+        'This counts the students currently linked to each supervisor and updates '
+        'their load fields to match.',
       ),
       actions: [
         TextButton(
@@ -126,14 +78,14 @@ Future<void> _fixSupervisorLoads(BuildContext context) async {
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Fix Now'),
+          child: const Text('Recalculate'),
         ),
       ],
     ),
   );
-  
+
   if (confirm != true) return;
-  
+
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -148,334 +100,567 @@ Future<void> _fixSupervisorLoads(BuildContext context) async {
       ),
     ),
   );
-  
+
   try {
     final db = FirebaseFirestore.instance;
-    
-    // Get all students
     final studentsSnap = await db.collection('students').get();
-    
-    // Count students per supervisor
-    final Map<String, List<String>> supervisorStudents = {};
-    
-    for (var studentDoc in studentsSnap.docs) {
-      final data = studentDoc.data();
-      final supervisorId = data['currentSupervisorId'];
-      
-      if (supervisorId != null && supervisorId != '') {
-        if (!supervisorStudents.containsKey(supervisorId)) {
-          supervisorStudents[supervisorId] = [];
-        }
-        supervisorStudents[supervisorId]!.add(studentDoc.id);
+    final supervisorStudents = <String, List<String>>{};
+
+    for (final studentDoc in studentsSnap.docs) {
+      final supervisorId = _readOptionalString(
+        studentDoc.data()['currentSupervisorId'],
+      );
+
+      if (supervisorId == null) {
+        continue;
       }
+
+      supervisorStudents.putIfAbsent(supervisorId, () => <String>[]);
+      supervisorStudents[supervisorId]!.add(studentDoc.id);
     }
-    
-    print('========================================');
-    print('SUPERVISOR LOAD RECALCULATION');
-    print('========================================');
-    
-    // Get all supervisors and update their loads
+
     final supervisorsSnap = await db.collection('supervisorProfiles').get();
     final batch = db.batch();
-    
-    for (var supervisorDoc in supervisorsSnap.docs) {
-      final supervisorId = supervisorDoc.id;
-      final assignedStudents = supervisorStudents[supervisorId] ?? [];
-      final actualCount = assignedStudents.length;
-      
-      print('Supervisor $supervisorId: $actualCount students');
-      
+
+    for (final supervisorDoc in supervisorsSnap.docs) {
+      final assignedStudents =
+          supervisorStudents[supervisorDoc.id] ?? <String>[];
+
       batch.update(supervisorDoc.reference, {
-        'currentLoad': actualCount,
+        'currentLoad': assignedStudents.length,
         'assignedStudentIds': assignedStudents,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
-    
+
     await batch.commit();
-    
-    print('========================================');
-    print('RECALCULATION COMPLETED');
-    print('========================================');
-    
-    if (context.mounted) Navigator.pop(context);
-    
+
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Text('✅ Recalculated loads for ${supervisorsSnap.size} supervisors'),
+        content: Text(
+          'Recalculated loads for ${supervisorsSnap.size} supervisors.',
+        ),
         backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
       ),
     );
-    
-  } catch (e, stackTrace) {
-    print('RECALCULATION FAILED: $e');
-    print('Stack trace: $stackTrace');
-    
-    if (context.mounted) Navigator.pop(context);
+  } catch (error) {
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Text('❌ Recalculation failed: $e'),
+        content: Text('Recalculation failed: $error'),
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 5),
       ),
     );
   }
 }
 
-// ── Main Widget ──────────────────────────────────────────────────────────────
+String? _readString(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+  return null;
+}
 
-class SupervisorAllocationPage extends ConsumerWidget {
+String? _readOptionalString(dynamic value) {
+  if (value is String && value.trim().isNotEmpty) {
+    return value.trim();
+  }
+  return null;
+}
+
+String _readStudentGenderLabel(Map<String, dynamic> data) {
+  final rawGender = _readString(
+    data,
+    ['gender', 'sex', 'studentGender', 'userGender'],
+  );
+
+  if (rawGender == null) {
+    return 'Not set';
+  }
+
+  final lower = rawGender.toLowerCase();
+  if (lower == 'm' || lower == 'male') return 'Male';
+  if (lower == 'f' || lower == 'female') return 'Female';
+  return rawGender;
+}
+
+List<String> _readStringList(dynamic value) {
+  if (value is! List) {
+    return const <String>[];
+  }
+
+  return value
+      .map((item) => item?.toString().trim() ?? '')
+      .where((item) => item.isNotEmpty)
+      .toList();
+}
+
+DataRow _emptyRow(String label, int columnCount) {
+  return DataRow(
+    cells: List.generate(
+      columnCount,
+      (index) => DataCell(index == 0 ? Text(label) : const SizedBox.shrink()),
+    ),
+  );
+}
+
+class SupervisorAllocationPage extends ConsumerStatefulWidget {
   const SupervisorAllocationPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+  ConsumerState<SupervisorAllocationPage> createState() =>
+      _SupervisorAllocationPageState();
+}
 
-    final unassignedAsync = ref.watch(unassignedStudentsProvider);
-    final assignedAsync = ref.watch(assignedStudentsProvider);
-    final totalAsync = ref.watch(totalStudentsProvider);
-    final supervisorsAsync = ref.watch(availableSupervisorsProvider);
+class _SupervisorAllocationPageState
+    extends ConsumerState<SupervisorAllocationPage> {
+  String _studentSearchQuery = '';
+  final GlobalKey _manualAssignmentSectionKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final studentsAsync = ref.watch(allocationStudentsProvider);
+    final supervisorsAsync = ref.watch(allocationSupervisorsProvider);
     final lastResult = ref.watch(lastAssignmentResultProvider);
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(unassignedStudentsProvider);
-          ref.invalidate(assignedStudentsProvider);
-          ref.invalidate(totalStudentsProvider);
-          ref.invalidate(availableSupervisorsProvider);
-        },
-        child: SingleChildScrollView(
+        onRefresh: () => _refreshAllocationData(ref),
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Supervisor Allocation',
-                      style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      // Fix loads button
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert),
-                        onSelected: (value) {
-                          if (value == 'fix_loads') {
-                            _fixSupervisorLoads(context);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'fix_loads',
-                            child: Row(
-                              children: [
-                                Icon(Icons.sync, size: 20),
-                                SizedBox(width: 12),
-                                Text('Recalculate Loads'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () {
-                          ref.invalidate(unassignedStudentsProvider);
-                          ref.invalidate(assignedStudentsProvider);
-                          ref.invalidate(totalStudentsProvider);
-                          ref.invalidate(availableSupervisorsProvider);
-                        },
-                        tooltip: 'Refresh Data',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Automatically assign students to university supervisors',
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-
-              if (lastResult != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Chip(
-                    label: Text(lastResult, style: const TextStyle(color: Colors.white)),
-                    backgroundColor: Colors.green,
-                    avatar: const Icon(Icons.check_circle, color: Colors.white),
-                    onDeleted: () {
-                      ref.read(lastAssignmentResultProvider.notifier).state = null;
-                    },
-                  ),
-                ),
-
-              // Stats Grid - 3 cards showing Total, Assigned, Unassigned
-              Row(
-                children: [
-                  Expanded(
-                    child: totalAsync.when(
-                      data: (total) => _StatCard(
-                        title: 'Total Students',
-                        value: total.toString(),
-                        icon: Icons.people_outline,
-                        color: Colors.blue,
-                      ),
-                      loading: () => _buildShimmerCard('Total Students', Icons.people_outline, Colors.blue),
-                      error: (_, __) => const _StatCard(title: 'Total Students', value: '0', icon: Icons.people_outline, color: Colors.blue),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: assignedAsync.when(
-                      data: (students) => _StatCard(
-                        title: 'Assigned',
-                        value: students.length.toString(),
-                        icon: Icons.check_circle_outline,
-                        color: Colors.green,
-                      ),
-                      loading: () => _buildShimmerCard('Assigned', Icons.check_circle_outline, Colors.green),
-                      error: (_, __) => const _StatCard(title: 'Assigned', value: '0', icon: Icons.check_circle_outline, color: Colors.green),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: unassignedAsync.when(
-                      data: (students) => _StatCard(
-                        title: 'Unassigned',
-                        value: students.length.toString(),
-                        icon: Icons.person_outline,
-                        color: Colors.orange,
-                      ),
-                      loading: () => _buildShimmerCard('Unassigned', Icons.person_outline, Colors.orange),
-                      error: (err, stack) {
-                        print('Unassigned error: $err');
-                        return const _StatCard(title: 'Unassigned', value: '0', icon: Icons.person_outline, color: Colors.orange);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Supervisors card
-              supervisorsAsync.when(
-                data: (sups) => _StatCard(
-                  title: 'Available Supervisors',
-                  value: sups.length.toString(),
-                  icon: Icons.supervised_user_circle_outlined,
-                  color: Colors.purple,
-                  subtitle: sups.isNotEmpty 
-                      ? '${sups.map((s) => s.currentLoad ?? 0).reduce((a, b) => a + b)} / ${sups.map((s) => s.maxStudents ?? 12).reduce((a, b) => a + b)} capacity used' 
-                      : null,
-                ),
-                loading: () => _buildShimmerCard('Available Supervisors', Icons.supervised_user_circle_outlined, Colors.purple),
-                error: (_, __) => const _StatCard(title: 'Available Supervisors', value: '0', icon: Icons.supervised_user_circle_outlined, color: Colors.purple),
-              ),
-
-              const SizedBox(height: 32),
-
-              Center(
-                child: FilledButton.icon(
-                  onPressed: unassignedAsync.value?.isEmpty ?? true
-                      ? null
-                      : () => _runAutoAssignment(context, ref),
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Run Auto Assignment'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    minimumSize: const Size(280, 56),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (unassignedAsync.value?.isEmpty ?? false)
-                        Column(
-                          children: const [
-                            Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
-                            SizedBox(height: 16),
-                            Text('All students assigned!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 8),
-                            Text('No unassigned students remaining'),
-                          ],
-                        )
-                      else if (lastResult != null)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Last Assignment', style: theme.textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Text(lastResult, style: theme.textTheme.bodyLarge),
-                          ],
-                        )
-                      else
-                        Column(
-                          children: [
-                            Icon(Icons.assignment_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(height: 16),
-                            Text('Ready to assign', style: theme.textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            const Text('Click the button above to start allocation', textAlign: TextAlign.center),
-                          ],
+                      Text(
+                        'Supervisor Allocation',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Assign students to supervisors.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 12),
+                Row(
+                  children: [
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) {
+                        if (value == 'fix_loads') {
+                          _fixSupervisorLoads(context);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'fix_loads',
+                          child: Row(
+                            children: [
+                              Icon(Icons.sync, size: 18),
+                              SizedBox(width: 12),
+                              Text('Recalculate Loads'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: () => _refreshAllocationData(ref),
+                      tooltip: 'Refresh',
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (lastResult != null) ...[
+              _ResultCard(
+                message: lastResult,
+                onClear: () {
+                  ref.read(lastAssignmentResultProvider.notifier).state = null;
+                },
               ),
+              const SizedBox(height: 16),
             ],
-          ),
+            _SectionCard(
+              title: 'Allocation Summary',
+              subtitle: 'Current student counts and supervisor capacity.',
+              child: studentsAsync.when(
+                data: (students) => supervisorsAsync.when(
+                  data: (supervisors) {
+                    final unassignedCount =
+                        students.where((student) => !student.isAssigned).length;
+                    final assignedCount = students.length - unassignedCount;
+                    final availableSupervisors = supervisors
+                        .where((supervisor) => supervisor.hasCapacity)
+                        .length;
+
+                    return _MetricTable(
+                      rows: [
+                        MapEntry('Total Students', students.length.toString()),
+                        MapEntry('Assigned Students', assignedCount.toString()),
+                        MapEntry(
+                          'Unassigned Students',
+                          unassignedCount.toString(),
+                        ),
+                        MapEntry(
+                          'Available Supervisors',
+                          availableSupervisors.toString(),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: _buildSectionLoader,
+                  error: _buildSectionError,
+                ),
+                loading: _buildSectionLoader,
+                error: _buildSectionError,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildActionBar(studentsAsync),
+            const SizedBox(height: 16),
+            _buildSupervisorSection(supervisorsAsync),
+            const SizedBox(height: 16),
+            _buildManualAssignmentSection(studentsAsync, supervisorsAsync),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildShimmerCard(String title, IconData icon, Color color) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: _StatCard(
-        title: title,
-        value: '···',
-        icon: icon,
-        color: color,
+  Widget _buildActionBar(
+    AsyncValue<List<_AllocationStudentRecord>> studentsAsync,
+  ) {
+    final unassignedCount = studentsAsync.maybeWhen(
+      data: (students) => students.where((student) => !student.isAssigned).length,
+      orElse: () => 0,
+    );
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        SizedBox(
+          width: 250,
+          child: FilledButton.icon(
+            onPressed: unassignedCount == 0
+                ? null
+                : () => _runAutoAssignment(unassignedCount),
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Run Auto Assignment'),
+          ),
+        ),
+        SizedBox(
+          width: 220,
+          child: OutlinedButton.icon(
+            onPressed: _jumpToManualAssignment,
+            icon: const Icon(Icons.person_add_alt_1),
+            label: const Text('Manual Assignment'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSupervisorSection(
+    AsyncValue<List<_AllocationSupervisorRecord>> supervisorsAsync,
+  ) {
+    return _SectionCard(
+      title: 'Supervisor Capacity',
+      subtitle: 'Supervisor availability.',
+      child: supervisorsAsync.when(
+        data: (supervisors) => _buildTableShell(
+          columns: const [
+            DataColumn(label: Text('Supervisor')),
+            DataColumn(label: Text('Department')),
+            DataColumn(label: Text('Specialties')),
+            DataColumn(label: Text('Load')),
+            DataColumn(label: Text('Available')),
+          ],
+          rows: supervisors.isEmpty
+              ? [_emptyRow('No supervisors found.', 5)]
+              : supervisors.map((supervisor) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        SizedBox(
+                          width: 190,
+                          child: Text(
+                            supervisor.fullName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        SizedBox(
+                          width: 170,
+                          child: Text(supervisor.departmentLabel),
+                        ),
+                      ),
+                      DataCell(
+                        SizedBox(
+                          width: 220,
+                          child: Text(
+                            supervisor.specialtiesLabel,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(Text(supervisor.loadLabel)),
+                      DataCell(Text(supervisor.availabilityLabel)),
+                    ],
+                  );
+                }).toList(),
+        ),
+        loading: _buildSectionLoader,
+        error: _buildSectionError,
       ),
     );
   }
 
-  Future<void> _runAutoAssignment(BuildContext context, WidgetRef ref) async {
-    final unassignedBefore = ref.read(unassignedStudentsProvider).value?.length ?? 0;
+  Widget _buildManualAssignmentSection(
+    AsyncValue<List<_AllocationStudentRecord>> studentsAsync,
+    AsyncValue<List<_AllocationSupervisorRecord>> supervisorsAsync,
+  ) {
+    return Container(
+      key: _manualAssignmentSectionKey,
+      child: _SectionCard(
+        title: 'Manual Assignment',
+        subtitle: 'Assign or reassign students.',
+        child: studentsAsync.when(
+          data: (students) => supervisorsAsync.when(
+            data: (supervisors) {
+              final filteredStudents = _filterStudents(students);
+              final hasAssignableSupervisors =
+                  supervisors.any((supervisor) => supervisor.hasCapacity);
+              final supervisorNames = {
+                for (final supervisor in supervisors)
+                  supervisor.id: supervisor.fullName,
+              };
 
-    if (unassignedBefore == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No students to assign')),
-      );
-      return;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText:
+                          'Search by student, registration number, or programme...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() => _studentSearchQuery = value.toLowerCase());
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTableShell(
+                    columns: const [
+                      DataColumn(label: Text('Student')),
+                      DataColumn(label: Text('Reg No.')),
+                      DataColumn(label: Text('Programme')),
+                      DataColumn(label: Text('Current Supervisor')),
+                      DataColumn(label: Text('Status')),
+                      DataColumn(label: Text('Action')),
+                    ],
+                    rows: filteredStudents.isEmpty
+                        ? [
+                            _emptyRow(
+                              students.isEmpty
+                                  ? 'No students found.'
+                                  : 'No students match the current search.',
+                              6,
+                            ),
+                          ]
+                        : filteredStudents.map((student) {
+                            final currentSupervisorName =
+                                student.currentSupervisorId == null
+                                    ? 'Not assigned'
+                                    : (supervisorNames[student.currentSupervisorId] ??
+                                        'Assigned');
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  SizedBox(
+                                    width: 190,
+                                    child: Text(
+                                      student.fullName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text(student.registrationNumber)),
+                                DataCell(
+                                  SizedBox(
+                                    width: 210,
+                                    child: Text(
+                                      student.program,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  SizedBox(
+                                    width: 190,
+                                    child: Text(
+                                      currentSupervisorName,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    student.isAssigned
+                                        ? 'Assigned'
+                                        : 'Unassigned',
+                                  ),
+                                ),
+                                DataCell(
+                                  hasAssignableSupervisors
+                                      ? OutlinedButton.icon(
+                                          onPressed: () =>
+                                              _openManualAssignmentDialog(
+                                            student,
+                                            supervisors,
+                                          ),
+                                          icon:
+                                              const Icon(Icons.person_add_alt_1),
+                                          label: Text(
+                                            student.isAssigned
+                                                ? 'Reassign'
+                                                : 'Assign',
+                                          ),
+                                        )
+                                      : const Text('No open supervisor'),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                  ),
+                ],
+              );
+            },
+            loading: _buildSectionLoader,
+            error: _buildSectionError,
+          ),
+          loading: _buildSectionLoader,
+          error: _buildSectionError,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _jumpToManualAssignment() async {
+    final context = _manualAssignmentSectionKey.currentContext;
+    if (context == null) return;
+
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
+    );
+  }
+
+  List<_AllocationStudentRecord> _filterStudents(
+    List<_AllocationStudentRecord> students,
+  ) {
+    final query = _studentSearchQuery.trim();
+    if (query.isEmpty) return students;
+
+    return students.where((student) {
+      return student.fullName.toLowerCase().contains(query) ||
+          student.registrationNumber.toLowerCase().contains(query) ||
+          student.program.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  int _manualSupervisorScore(
+    _AllocationSupervisorRecord supervisor,
+    _AllocationStudentRecord student,
+  ) {
+    var score = 0;
+    if (_matchesProgram(supervisor, student.program)) {
+      score += 100;
+    }
+    score += supervisor.remainingSlots * 3;
+    score -= supervisor.currentLoad;
+    return score;
+  }
+
+  bool _matchesProgram(
+    _AllocationSupervisorRecord supervisor,
+    String studentProgram,
+  ) {
+    final normalizedProgram = _normalizeComparable(studentProgram);
+    if (normalizedProgram.isEmpty) {
+      return false;
     }
 
+    final specialtyMatch = supervisor.programSpecialties.any((specialty) {
+      final normalizedSpecialty = _normalizeComparable(specialty);
+      return normalizedSpecialty == normalizedProgram ||
+          normalizedSpecialty.contains(normalizedProgram) ||
+          normalizedProgram.contains(normalizedSpecialty);
+    });
+
+    final normalizedDepartment =
+        _normalizeComparable(supervisor.departmentLabel);
+
+    return specialtyMatch ||
+        normalizedDepartment == normalizedProgram ||
+        normalizedDepartment.contains(normalizedProgram) ||
+        normalizedProgram.contains(normalizedDepartment);
+  }
+
+  Future<void> _runAutoAssignment(int unassignedCount) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Run Auto Assignment?'),
-        content: Text('This will assign $unassignedBefore unassigned students to available supervisors.'),
+        content: Text(
+          'This will assign $unassignedCount unassigned students.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Assign Now')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Assign Now'),
+          ),
         ],
       ),
     );
@@ -488,7 +673,7 @@ class SupervisorAllocationPage extends ConsumerWidget {
       builder: (context) => const Center(
         child: Card(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -503,101 +688,494 @@ class SupervisorAllocationPage extends ConsumerWidget {
     );
 
     try {
-      final functions = FirebaseFunctions.instance;
-      final result = await functions.httpsCallable('assignSupervisors').call({
-        'reAssignAll': false,
-      });
+      final result =
+          await FirebaseFunctions.instance.httpsCallable('assignSupervisors').call(
+        {
+          'reAssignAll': false,
+        },
+      );
 
-      if (!context.mounted) return;
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
 
-      final message = result.data['message'] as String;
-      final count = result.data['assignedCount'] as int;
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final message = data['message'] as String? ?? 'Students assigned.';
 
-      ref.read(lastAssignmentResultProvider.notifier).state = '$count students assigned';
+      ref.read(lastAssignmentResultProvider.notifier).state = message;
+      await _refreshAllocationData(ref);
 
-      // Force immediate refresh
-      ref.invalidate(unassignedStudentsProvider);
-      ref.invalidate(assignedStudentsProvider);
-      ref.invalidate(totalStudentsProvider);
-      ref.invalidate(availableSupervisorsProvider);
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.green,
-          duration: const Duration(seconds: 6),
         ),
       );
-    } catch (e) {
-      if (!context.mounted) return;
-      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Assignment failed: $e'),
+          content: Text('Assignment failed: $error'),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 6),
         ),
       );
     }
   }
 
+  Future<void> _openManualAssignmentDialog(
+    _AllocationStudentRecord student,
+    List<_AllocationSupervisorRecord> supervisors,
+  ) async {
+    var currentSupervisorName = 'Not assigned';
+    if (student.currentSupervisorId != null) {
+      final matches = supervisors
+          .where((supervisor) => supervisor.id == student.currentSupervisorId)
+          .toList();
+      currentSupervisorName =
+          matches.isEmpty ? 'Assigned' : matches.first.fullName;
+    }
+    final availableSupervisors = supervisors
+        .where((supervisor) => supervisor.hasCapacity)
+        .toList()
+      ..sort(
+        (left, right) => _manualSupervisorScore(right, student)
+            .compareTo(_manualSupervisorScore(left, student)),
+      );
+
+    if (availableSupervisors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No supervisors have open capacity right now.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    String selectedSupervisorId = availableSupervisors.first.id;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(student.isAssigned ? 'Reassign Student' : 'Assign Student'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  student.fullName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text('Reg No.: ${student.registrationNumber}'),
+                Text('Programme: ${student.program}'),
+                Text('Gender: ${student.gender}'),
+                Text('Current supervisor: $currentSupervisorName'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedSupervisorId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Supervisor',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: availableSupervisors.map((supervisor) {
+                    return DropdownMenuItem(
+                      value: supervisor.id,
+                      child: Text(
+                        '${supervisor.fullName} | ${supervisor.loadLabel}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() => selectedSupervisorId = value);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(student.isAssigned ? 'Reassign Student' : 'Assign Student'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final selectedSupervisor = availableSupervisors.firstWhere(
+      (supervisor) => supervisor.id == selectedSupervisorId,
+    );
+
+    await _runManualAssignment(student, selectedSupervisor);
+  }
+
+  Future<void> _runManualAssignment(
+    _AllocationStudentRecord student,
+    _AllocationSupervisorRecord supervisor,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Saving manual assignment...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('manualAssignSupervisor')
+          .call({
+        'studentId': student.id,
+        'supervisorId': supervisor.id,
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final message =
+          data['message'] as String? ?? 'Manual assignment completed.';
+
+      ref.read(lastAssignmentResultProvider.notifier).state = message;
+      await _refreshAllocationData(ref);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Manual assignment failed: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildTableShell({
+    required List<DataColumn> columns,
+    required List<DataRow> rows,
+  }) {
+    final theme = Theme.of(context);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 24,
+            horizontalMargin: 16,
+            headingRowHeight: 50,
+            dataRowMinHeight: 64,
+            dataRowMaxHeight: 72,
+            headingRowColor: WidgetStatePropertyAll(
+              theme.colorScheme.primaryContainer.withOpacity(0.35),
+            ),
+            columns: columns,
+            rows: rows,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionLoader() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildSectionError(Object error, StackTrace stackTrace) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        'Failed to load this section: $error',
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+    );
+  }
+
+  String _normalizeComparable(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+  }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final String? subtitle;
-
-  const _StatCard({
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
     required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.subtitle,
+    required this.subtitle,
+    required this.child,
   });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Card(
-      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 12),
             Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              title,
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 10,
-                ),
-                textAlign: TextAlign.center,
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ],
+            ),
+            const SizedBox(height: 16),
+            child,
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MetricTable extends StatelessWidget {
+  const _MetricTable({required this.rows});
+
+  final List<MapEntry<String, String>> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 24,
+            horizontalMargin: 16,
+            headingRowHeight: 50,
+            dataRowMinHeight: 56,
+            dataRowMaxHeight: 64,
+            headingRowColor: WidgetStatePropertyAll(
+              theme.colorScheme.primaryContainer.withOpacity(0.35),
+            ),
+            columns: const [
+              DataColumn(label: Text('Metric')),
+              DataColumn(label: Text('Count')),
+            ],
+            rows: rows.map((row) {
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      row.key,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  DataCell(Text(row.value)),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({
+    required this.message,
+    required this.onClear,
+  });
+
+  final String message;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withOpacity(0.35),
+      child: ListTile(
+        leading: Icon(
+          Icons.check_circle,
+          color: theme.colorScheme.primary,
+        ),
+        title: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        trailing: IconButton(
+          onPressed: onClear,
+          icon: const Icon(Icons.close),
+        ),
+      ),
+    );
+  }
+}
+
+class _AllocationStudentRecord {
+  const _AllocationStudentRecord({
+    required this.id,
+    required this.fullName,
+    required this.registrationNumber,
+    required this.program,
+    required this.gender,
+    required this.currentSupervisorId,
+  });
+
+  final String id;
+  final String fullName;
+  final String registrationNumber;
+  final String program;
+  final String gender;
+  final String? currentSupervisorId;
+
+  bool get isAssigned => currentSupervisorId != null;
+
+  factory _AllocationStudentRecord.fromSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    final data = snapshot.data() ?? <String, dynamic>{};
+
+    return _AllocationStudentRecord(
+      id: snapshot.id,
+      fullName:
+          _readString(data, ['fullName', 'displayName']) ?? 'Unknown Student',
+      registrationNumber: _readString(
+            data,
+            ['registrationNumber', 'registrationNo'],
+          ) ??
+          'Not set',
+      program: _readString(data, ['program']) ?? 'Not set',
+      gender: _readStudentGenderLabel(data),
+      currentSupervisorId: _readOptionalString(data['currentSupervisorId']),
+    );
+  }
+}
+
+class _AllocationSupervisorRecord {
+  const _AllocationSupervisorRecord({
+    required this.id,
+    required this.fullName,
+    required this.department,
+    required this.programSpecialties,
+    required this.currentLoad,
+    required this.maxStudents,
+    required this.isAvailable,
+  });
+
+  final String id;
+  final String fullName;
+  final String department;
+  final List<String> programSpecialties;
+  final int currentLoad;
+  final int maxStudents;
+  final bool isAvailable;
+
+  int get remainingSlots =>
+      currentLoad >= maxStudents ? 0 : maxStudents - currentLoad;
+
+  bool get hasCapacity => isAvailable && currentLoad < maxStudents;
+
+  String get departmentLabel => department.isEmpty ? 'Not set' : department;
+
+  String get specialtiesLabel =>
+      programSpecialties.isEmpty ? 'Not set' : programSpecialties.join(', ');
+
+  String get loadLabel => '$currentLoad / $maxStudents';
+
+  String get availabilityLabel {
+    if (!isAvailable) return 'Unavailable';
+    if (remainingSlots == 0) return 'Full';
+    return '$remainingSlots left';
+  }
+
+  factory _AllocationSupervisorRecord.fromSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    final data = snapshot.data() ?? <String, dynamic>{};
+    final rawMaxStudents = data['maxStudents'];
+    final parsedMaxStudents =
+        rawMaxStudents is num ? rawMaxStudents.toInt() : _defaultSupervisorCapacity;
+
+    return _AllocationSupervisorRecord(
+      id: snapshot.id,
+      fullName:
+          _readString(data, ['fullName', 'FullName']) ?? 'Unknown Supervisor',
+      department: _readString(data, ['department']) ?? '',
+      programSpecialties: _readStringList(data['programSpecialties']),
+      currentLoad: data['currentLoad'] is num
+          ? (data['currentLoad'] as num).toInt()
+          : 0,
+      maxStudents:
+          parsedMaxStudents <= 0 ? _defaultSupervisorCapacity : parsedMaxStudents,
+      isAvailable: data['isAvailable'] is bool ? data['isAvailable'] as bool : true,
     );
   }
 }

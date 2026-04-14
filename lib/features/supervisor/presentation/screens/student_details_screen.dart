@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../student/data/models/student_profile_model.dart';
+import '../../../student/data/models/internship_report_model.dart';
 import '../../../placements/data/models/placement_model.dart';
-import '../../../logbook/data/models/weekly_logbook_summary_model.dart';
+import '../../../logbook/data/models/logbook_entry_model.dart';
 import 'student_evaluation_screen.dart';
-import 'weekly_summary_review_screen.dart';
+import 'logbook_entry_review_screen.dart';
+import 'final_report_review_screen.dart';
 
 // ============================================================================
 // PROVIDERS — scoped to this student
@@ -27,18 +29,38 @@ final _studentPlacementProvider =
   return PlacementModel.fromFirestore(snap.docs.first, null);
 });
 
-/// All weekly summaries submitted by this student
+/// All weekly logbook entries submitted by this student
 final _studentWeeklySummariesProvider =
-    StreamProvider.family<List<WeeklyLogbookSummaryModel>, String>(
+    StreamProvider.family<List<LogbookEntryModel>, String>(
         (ref, studentId) {
   return FirebaseFirestore.instance
-      .collection('weekly_logbook_summaries')
+      .collection('logbookEntries')
       .where('studentId', isEqualTo: studentId)
-      .orderBy('weekNumber', descending: false)
+      .orderBy('weekNumber', descending: true)
       .snapshots()
       .map((snap) => snap.docs
-          .map((doc) => WeeklyLogbookSummaryModel.fromFirestore(doc, null))
+          .map((doc) => LogbookEntryModel.fromFirestore(doc, null))
           .toList());
+});
+
+final _studentFinalReportProvider =
+    StreamProvider.family<InternshipReportModel?, String>((ref, studentId) {
+  return FirebaseFirestore.instance
+      .collection('internshipReports')
+      .where('studentId', isEqualTo: studentId)
+      .snapshots()
+      .map((snap) {
+        final reports = snap.docs
+            .map((doc) => InternshipReportModel.fromFirestore(doc, null))
+            .toList()
+          ..sort((a, b) {
+            final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
+            final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
+            return bDate.compareTo(aDate);
+          });
+        if (reports.isEmpty) return null;
+        return reports.first;
+      });
 });
 
 // ============================================================================
@@ -56,6 +78,7 @@ class StudentDetailsScreen extends ConsumerWidget {
     final placementAsync = ref.watch(_studentPlacementProvider(student.uid));
     final summariesAsync =
         ref.watch(_studentWeeklySummariesProvider(student.uid));
+    final reportAsync = ref.watch(_studentFinalReportProvider(student.uid));
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -67,6 +90,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(_studentPlacementProvider(student.uid));
           ref.invalidate(_studentWeeklySummariesProvider(student.uid));
+          ref.invalidate(_studentFinalReportProvider(student.uid));
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -89,7 +113,7 @@ class StudentDetailsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // ── Weekly logbook summaries ───────────────────────────────
+            // ── Weekly logbook entries ─────────────────────────────────
             _SectionTitle(
               title: 'Logbook Submissions',
               icon: Icons.book_outlined,
@@ -102,6 +126,22 @@ class StudentDetailsScreen extends ConsumerWidget {
                   : _buildLogbookList(context, summaries, theme),
               loading: () =>
                   const _LoadingCard(message: 'Loading logbooks...'),
+              error: (e, _) => _ErrorCard(message: e.toString()),
+            ),
+            const SizedBox(height: 16),
+
+            _SectionTitle(
+              title: 'Final Report',
+              icon: Icons.assignment_outlined,
+              color: Colors.teal,
+            ),
+            const SizedBox(height: 12),
+            reportAsync.when(
+              data: (report) => report == null
+                  ? _buildNoFinalReportCard(theme)
+                  : _buildFinalReportCard(context, report, theme),
+              loading: () =>
+                  const _LoadingCard(message: 'Loading final report...'),
               error: (e, _) => _ErrorCard(message: e.toString()),
             ),
             const SizedBox(height: 24),
@@ -313,7 +353,7 @@ class StudentDetailsScreen extends ConsumerWidget {
   // ── Logbook list ──────────────────────────────────────────────────────────
 
   Widget _buildLogbookList(BuildContext context,
-      List<WeeklyLogbookSummaryModel> summaries, ThemeData theme) {
+      List<LogbookEntryModel> summaries, ThemeData theme) {
     // Summary stats row
     final reviewed =
         summaries.where((s) => s.isReviewedByUniversitySupervisor).length;
@@ -346,7 +386,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
 
-        // List of weekly summaries
+        // List of weekly logbooks
         ...summaries.map((summary) {
           final isReviewed = summary.isReviewedByUniversitySupervisor;
           return Card(
@@ -379,13 +419,13 @@ class StudentDetailsScreen extends ConsumerWidget {
                 ),
               ),
               title: Text(
-                'Week ${summary.weekNumber} Summary',
+                'Week ${summary.weekNumber} Logbook',
                 style: const TextStyle(
                     fontWeight: FontWeight.w600, fontSize: 14),
               ),
               subtitle: Text(
-                '${summary.totalHoursWorked}h worked • '
-                '${summary.dailyEntryIds.length} days • '
+                '${summary.hoursWorked.toStringAsFixed(summary.hoursWorked.truncateToDouble() == summary.hoursWorked ? 0 : 1)}h worked • '
+                '${summary.attachmentUrls.length} attachment${summary.attachmentUrls.length == 1 ? '' : 's'} • '
                 '${isReviewed ? 'Reviewed ✓' : 'Pending review'}',
                 style: TextStyle(
                   fontSize: 12,
@@ -403,9 +443,8 @@ class StudentDetailsScreen extends ConsumerWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => WeeklySummaryReviewScreen(
-                    summary: summary,
-                    isCompanySupervisor: false,
+                  builder: (_) => LogbookEntryReviewScreen(
+                    entry: summary,
                   ),
                 ),
               ),
@@ -440,7 +479,7 @@ class StudentDetailsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'This student has not submitted any weekly summaries.',
+              'This student has not submitted any weekly logbooks.',
               style:
                   TextStyle(fontSize: 12, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
@@ -452,6 +491,104 @@ class StudentDetailsScreen extends ConsumerWidget {
   }
 
   // ── Evaluation button ─────────────────────────────────────────────────────
+
+  Widget _buildNoFinalReportCard(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: Colors.teal.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.teal.shade100),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Row(
+          children: [
+            Icon(Icons.assignment_late_outlined,
+                color: Colors.teal.shade400),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'No final report submitted yet.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinalReportCard(
+    BuildContext context,
+    InternshipReportModel report,
+    ThemeData theme,
+  ) {
+    final statusColor = report.isApproved
+        ? Colors.green
+        : report.isRejected
+            ? Colors.red
+            : Colors.orange;
+    final statusLabel = report.isApproved
+        ? 'Approved'
+        : report.isRejected
+            ? 'Returned'
+            : 'Submitted';
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: statusColor.withOpacity(0.2)),
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: statusColor.withOpacity(0.12),
+          child: const Icon(Icons.picture_as_pdf, color: Colors.red),
+        ),
+        title: Text(
+          report.fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              statusLabel,
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (report.supervisorFeedback != null &&
+                report.supervisorFeedback!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  report.supervisorFeedback!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FinalReportReviewScreen(report: report),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildEvaluationButton(BuildContext context) {
     return SizedBox(

@@ -6,11 +6,9 @@ import 'package:go_router/go_router.dart';
 
 // Departments for supervisors only
 const List<String> supervisorDepartments = [
-  'Faculty of Science and Technology',
-  'Faculty of Business and Management',
-  'Faculty of Engineering',
-  'Faculty of Education',
-  'Other',
+  'Department of Computer Science',
+  'Department of Information Technology',
+  'Department of Software Engineering',
 ];
 
 class RegisterPage extends ConsumerStatefulWidget {
@@ -203,18 +201,39 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 if (_selectedRole == UserRole.supervisor)
                   DropdownButtonFormField<String>(
                     value: _selectedDepartment,
+                    isExpanded: true,
+                    menuMaxHeight: 280,
                     decoration: const InputDecoration(
                       labelText: 'Department',
                       prefixIcon: Icon(Icons.school_outlined),
                       border: OutlineInputBorder(),
                     ),
-                    hint: const Text('Select your department'),
+                    hint: const Text(
+                      'Select your department',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     items: supervisorDepartments.map((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
-                        child: Text(value),
+                        child: Text(
+                          value,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       );
                     }).toList(),
+                    selectedItemBuilder: (context) {
+                      return supervisorDepartments.map((String value) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            value,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        );
+                      }).toList();
+                    },
                     onChanged: (val) {
                       setState(() {
                         _selectedDepartment = val;

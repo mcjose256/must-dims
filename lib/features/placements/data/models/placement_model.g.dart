@@ -31,6 +31,9 @@ _$PlacementModelImpl _$$PlacementModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['supervisorRejectedAt'] as String),
       academicYear: json['academicYear'] as String,
+      actualStartDate: json['actualStartDate'] == null
+          ? null
+          : DateTime.parse(json['actualStartDate'] as String),
       startDate: json['startDate'] == null
           ? null
           : DateTime.parse(json['startDate'] as String),
@@ -73,6 +76,7 @@ Map<String, dynamic> _$$PlacementModelImplToJson(
       'supervisorApprovedAt': instance.supervisorApprovedAt?.toIso8601String(),
       'supervisorRejectedAt': instance.supervisorRejectedAt?.toIso8601String(),
       'academicYear': instance.academicYear,
+      'actualStartDate': instance.actualStartDate?.toIso8601String(),
       'startDate': instance.startDate?.toIso8601String(),
       'endDate': instance.endDate?.toIso8601String(),
       'actualEndDate': instance.actualEndDate?.toIso8601String(),

@@ -66,7 +66,7 @@ class _LogbookReviewPageState extends ConsumerState<LogbookReviewPage> {
     super.dispose();
   }
 
-  Future<void> _submitReview() async {
+  Future<void> _submitReview(LogbookEntryModel logbook) async {
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -102,6 +102,9 @@ class _LogbookReviewPageState extends ConsumerState<LogbookReviewPage> {
         'initiativeRating': _initiativeRating,
         'communicationRating': _communicationRating,
         'companyReviewedAt': FieldValue.serverTimestamp(),
+        'status': logbook.isReviewedByUniversitySupervisor
+            ? 'approved'
+            : logbook.status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -361,7 +364,9 @@ class _LogbookReviewPageState extends ConsumerState<LogbookReviewPage> {
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: _isSubmitting ? null : _submitReview,
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _submitReview(logbook),
                               style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                               ),

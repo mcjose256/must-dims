@@ -17,7 +17,7 @@ class DailyEntryDetailsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Day ${entry.dayNumber} Details'),
+        title: Text('Daily Log ${entry.dayNumber}'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

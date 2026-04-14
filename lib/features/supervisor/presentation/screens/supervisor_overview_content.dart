@@ -6,11 +6,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../auth/controllers/auth_controller.dart';
 import '../providers/supervisor_providers.dart';
 import '../../../placements/data/models/placement_model.dart';
+import '../../../student/data/models/student_profile_model.dart';
 import '../../controllers/supervisor_controller.dart';
 import 'student_details_screen.dart';
 import 'placement_letter_review_page.dart';
-import '../../../logbook/presentation/pages/weekly_summary_details_page.dart';
-import 'weekly_summary_review_screen.dart';
+import 'logbook_entry_review_screen.dart';
+import 'final_report_review_screen.dart';
 
 // ============================================================================
 // PROVIDERS
@@ -52,8 +53,10 @@ class SupervisorOverviewContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(supervisorProfileProvider);
     final studentsAsync = ref.watch(assignedStudentsProvider);
-    final pendingSummariesAsync = ref.watch(pendingWeeklySummariesProvider);
+    final studentsProgressAsync = ref.watch(supervisedStudentProgressProvider);
+    final pendingLogbooksAsync = ref.watch(pendingLogbooksProvider);
     final pendingLettersAsync = ref.watch(pendingLetterReviewsProvider);
+    final pendingFinalReportsAsync = ref.watch(pendingFinalReportsProvider);
 
     return profileAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -95,8 +98,10 @@ class SupervisorOverviewContent extends ConsumerWidget {
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(pendingLetterReviewsProvider);
-            ref.invalidate(pendingWeeklySummariesProvider);
+            ref.invalidate(pendingLogbooksProvider);
+            ref.invalidate(pendingFinalReportsProvider);
             ref.invalidate(assignedStudentsProvider);
+            ref.invalidate(supervisedStudentProgressProvider);
           },
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -153,6 +158,62 @@ class SupervisorOverviewContent extends ConsumerWidget {
               ),
               const SizedBox(height: 28),
 
+              _SectionTitle(
+                title: 'Student Progress Snapshot',
+                icon: Icons.insights_outlined,
+                color: Colors.indigo,
+              ),
+              const SizedBox(height: 12),
+              studentsProgressAsync.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return _EmptyState(
+                      icon: Icons.timeline_outlined,
+                      message: 'No supervised students to track yet',
+                      color: Colors.indigo,
+                    );
+                  }
+
+                  final activeCount =
+                      items.where((item) => item.isInProgress).length;
+                  final awaitingStartCount =
+                      items.where((item) => item.isAwaitingStart).length;
+                  final completedCount =
+                      items.where((item) => item.isCompleted).length;
+
+                  return Row(
+                    children: [
+                      _buildStatCard(
+                        context,
+                        label: 'Active',
+                        value: '$activeCount',
+                        color: Colors.blue,
+                        icon: Icons.play_circle_outline_rounded,
+                      ),
+                      _buildStatCard(
+                        context,
+                        label: 'Awaiting Start',
+                        value: '$awaitingStartCount',
+                        color: Colors.orange,
+                        icon: Icons.hourglass_top_rounded,
+                      ),
+                      _buildStatCard(
+                        context,
+                        label: 'Completed',
+                        value: '$completedCount',
+                        color: Colors.green,
+                        icon: Icons.task_alt_rounded,
+                      ),
+                    ],
+                  );
+                },
+                loading: () => const _LoadingCard(
+                  message: 'Loading student progress...',
+                ),
+                error: (e, _) => _ErrorCard(message: e.toString()),
+              ),
+              const SizedBox(height: 28),
+
               // ── SECTION 1: Pending acceptance letter reviews ─────────
               _SectionTitle(
                 title: 'Pending Acceptance Letters',
@@ -180,35 +241,23 @@ class SupervisorOverviewContent extends ConsumerWidget {
 
               // ── SECTION 2: Pending weekly logbook reviews ────────────
               _SectionTitle(
-                title: 'Pending Weekly Reviews',
+                title: 'Pending Weekly Logbooks',
                 icon: Icons.book_outlined,
                 color: Colors.orange,
               ),
               const SizedBox(height: 12),
-              pendingSummariesAsync.when(
-                data: (summaries) {
-                  final pending = summaries
-                      .where((s) => !s.isReviewedByUniversitySupervisor)
-                      .toList();
-
-                  if (pending.isEmpty) {
-                    // ── FIX 2: Distinguish "none submitted" vs "all reviewed"
-                    // Previously always showed "All weekly summaries reviewed"
-                    // even when no student had submitted anything yet.
-                    final anyExist = summaries.isNotEmpty;
+              pendingLogbooksAsync.when(
+                data: (entries) {
+                  if (entries.isEmpty) {
                     return _EmptyState(
-                      icon: anyExist
-                          ? Icons.done_all
-                          : Icons.hourglass_empty_outlined,
-                      message: anyExist
-                          ? 'All submitted summaries reviewed'
-                          : 'No weekly summaries submitted yet',
+                      icon: Icons.done_all,
+                      message: 'No weekly logbooks awaiting review',
                       color: Colors.orange,
                     );
                   }
 
                   return Column(
-                    children: pending.map((summary) {
+                    children: entries.map((entry) {
                       return Card(
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -219,25 +268,26 @@ class SupervisorOverviewContent extends ConsumerWidget {
                           leading: CircleAvatar(
                             backgroundColor: Colors.orange,
                             child: Text(
-                              '${summary.weekNumber}',
+                              '${entry.weekNumber}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          title: Text('Week ${summary.weekNumber} Summary'),
-                          subtitle: Text(
-                            '${summary.totalHoursWorked} hours • '
-                            '${summary.dailyEntryIds.length} days',
+                          title: _StudentNameLoader(studentId: entry.studentId),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Week ${entry.weekNumber} • ${entry.hoursWorked.toStringAsFixed(entry.hoursWorked.truncateToDouble() == entry.hoursWorked ? 0 : 1)} hours',
+                            ),
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => WeeklySummaryReviewScreen(
-                                summary: summary,
-                                isCompanySupervisor: false,
+                              builder: (_) => LogbookEntryReviewScreen(
+                                entry: entry,
                               ),
                             ),
                           ),
@@ -247,12 +297,106 @@ class SupervisorOverviewContent extends ConsumerWidget {
                   );
                 },
                 loading: () => const _LoadingCard(
-                    message: 'Loading weekly summaries...'),
+                    message: 'Loading weekly logbooks...'),
                 error: (e, _) => _ErrorCard(message: e.toString()),
               ),
               const SizedBox(height: 28),
 
               // ── SECTION 3: All assigned students ─────────────────────
+              _SectionTitle(
+                title: 'Pending Final Reports',
+                icon: Icons.assignment_outlined,
+                color: Colors.teal,
+              ),
+              const SizedBox(height: 12),
+              pendingFinalReportsAsync.when(
+                data: (reports) {
+                  if (reports.isEmpty) {
+                    return _EmptyState(
+                      icon: Icons.assignment_turned_in_outlined,
+                      message: 'No final reports awaiting review',
+                      color: Colors.teal,
+                    );
+                  }
+
+                  return Column(
+                    children: reports.map((report) {
+                      return Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.teal.withOpacity(0.12),
+                            child: const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.teal,
+                              size: 18,
+                            ),
+                          ),
+                          title: _StudentNameLoader(studentId: report.studentId),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              report.fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FinalReportReviewScreen(
+                                report: report,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+                loading: () => const _LoadingCard(
+                  message: 'Loading final reports...',
+                ),
+                error: (e, _) => _ErrorCard(message: e.toString()),
+              ),
+              const SizedBox(height: 28),
+
+              _SectionTitle(
+                title: 'Student Progress',
+                icon: Icons.show_chart_rounded,
+                color: Colors.indigo,
+              ),
+              const SizedBox(height: 12),
+              studentsProgressAsync.when(
+                data: (students) {
+                  if (students.isEmpty) {
+                    return _EmptyState(
+                      icon: Icons.timeline_outlined,
+                      message: 'No student progress available yet',
+                      color: Colors.indigo,
+                    );
+                  }
+
+                  return Column(
+                    children: students.map((student) {
+                      return _SupervisorStudentProgressCard(
+                        progress: student,
+                      );
+                    }).toList(),
+                  );
+                },
+                loading: () => const _LoadingCard(
+                  message: 'Loading progress details...',
+                ),
+                error: (e, _) => _ErrorCard(message: e.toString()),
+              ),
+              const SizedBox(height: 28),
+
               _SectionTitle(
                 title: 'Your Students',
                 icon: Icons.people_outline,
@@ -464,6 +608,208 @@ class _StudentNameLoader extends ConsumerWidget {
       error: (_, __) => const Text('Unknown Student'),
     );
   }
+}
+
+class _SupervisorStudentProgressCard extends StatelessWidget {
+  final SupervisedStudentProgress progress;
+
+  const _SupervisorStudentProgressCard({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final placement = progress.placement;
+    final percent = progress.progressPercent.clamp(0.0, 100.0).toDouble();
+    final statusInfo = _statusInfo(progress);
+    final progressLabel = placement == null
+        ? 'No placement record yet'
+        : placement.status == PlacementStatus.completed
+            ? 'Internship completed'
+            : placement.status == PlacementStatus.approved
+                ? 'Placement approved and ready to begin'
+                : '${placement.weeksCompleted}/${placement.totalWeeks} weeks completed';
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StudentDetailsScreen(student: progress.student),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: statusInfo.color.withOpacity(0.12),
+                    child: Text(
+                      progress.student.fullName.isNotEmpty
+                          ? progress.student.fullName[0].toUpperCase()
+                          : 'S',
+                      style: TextStyle(
+                        color: statusInfo.color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          progress.student.fullName,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${progress.student.registrationNumber} • ${progress.student.program}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _StatusChip(
+                    label: statusInfo.label,
+                    color: statusInfo.color,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      progressLabel,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${percent.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: statusInfo.color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: percent / 100,
+                  minHeight: 8,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(statusInfo.color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _StudentProgressStatus _statusInfo(SupervisedStudentProgress progress) {
+    final placement = progress.placement;
+    if (placement != null) {
+      switch (placement.status) {
+        case PlacementStatus.completed:
+          return const _StudentProgressStatus('Completed', Colors.green);
+        case PlacementStatus.active:
+        case PlacementStatus.extended:
+          return const _StudentProgressStatus('In Progress', Colors.blue);
+        case PlacementStatus.approved:
+          return const _StudentProgressStatus('Ready To Start', Colors.orange);
+        case PlacementStatus.pendingSupervisorReview:
+          return const _StudentProgressStatus('Awaiting Review', Colors.deepOrange);
+        case PlacementStatus.rejected:
+          return const _StudentProgressStatus('Needs Revision', Colors.red);
+        case PlacementStatus.cancelled:
+        case PlacementStatus.terminated:
+          return const _StudentProgressStatus('Stopped', Colors.red);
+      }
+    }
+
+    switch (progress.student.internshipStatus) {
+      case StudentInternshipStatus.completed:
+        return const _StudentProgressStatus('Completed', Colors.green);
+      case StudentInternshipStatus.inProgress:
+        return const _StudentProgressStatus('In Progress', Colors.blue);
+      case StudentInternshipStatus.approved:
+        return const _StudentProgressStatus('Ready To Start', Colors.orange);
+      case StudentInternshipStatus.awaitingApproval:
+        return const _StudentProgressStatus('Awaiting Review', Colors.deepOrange);
+      case StudentInternshipStatus.rejected:
+        return const _StudentProgressStatus('Needs Revision', Colors.red);
+      case StudentInternshipStatus.deferred:
+        return const _StudentProgressStatus('Deferred', Colors.purple);
+      case StudentInternshipStatus.terminated:
+        return const _StudentProgressStatus('Stopped', Colors.red);
+      case StudentInternshipStatus.notStarted:
+        return const _StudentProgressStatus('Not Started', Colors.grey);
+    }
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusChip({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentProgressStatus {
+  final String label;
+  final Color color;
+
+  const _StudentProgressStatus(this.label, this.color);
 }
 
 // ============================================================================

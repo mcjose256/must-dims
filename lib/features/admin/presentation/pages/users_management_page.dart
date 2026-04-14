@@ -168,13 +168,14 @@ class _UsersListView extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(approvedUsersProvider(role));
           },
-          child: ListView.separated(
+          child: ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: filteredUsers.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return _UserCard(user: filteredUsers[index]);
-            },
+            children: [
+              _UsersTableCard(
+                users: filteredUsers,
+                role: role,
+              ),
+            ],
           ),
         );
       },
@@ -198,102 +199,268 @@ class _UsersListView extends ConsumerWidget {
   }
 }
 
-class _UserCard extends ConsumerWidget {
-  final UserModel user;
+class _UsersTableCard extends StatelessWidget {
+  const _UsersTableCard({
+    required this.users,
+    required this.role,
+  });
 
-  const _UserCard({required this.user});
+  final List<UserModel> users;
+  final UserRole role;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final roleLabel = role == UserRole.student ? 'Students' : 'Supervisors';
 
     return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 12,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$roleLabel Table',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${users.length}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    columnSpacing: 24,
+                    horizontalMargin: 16,
+                    headingRowHeight: 50,
+                    dataRowMinHeight: 64,
+                    dataRowMaxHeight: 72,
+                    headingRowColor: WidgetStatePropertyAll(
+                      theme.colorScheme.primaryContainer.withOpacity(0.35),
+                    ),
+                    columns: const [
+                      DataColumn(label: Text('User')),
+                      DataColumn(label: Text('Email')),
+                      DataColumn(label: Text('Phone')),
+                      DataColumn(label: Text('Actions')),
+                    ],
+                    rows: users
+                        .map(
+                          (user) => DataRow(
+                            cells: [
+                              DataCell(_UserIdentityCell(user: user)),
+                              DataCell(
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    minWidth: 220,
+                                    maxWidth: 280,
+                                  ),
+                                  child: Text(
+                                    user.email,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                SizedBox(
+                                  width: 140,
+                                  child: Text(
+                                    (user.phoneNumber == null ||
+                                            user.phoneNumber!.trim().isEmpty)
+                                        ? 'Not set'
+                                        : user.phoneNumber!,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: (user.phoneNumber == null ||
+                                              user.phoneNumber!.trim().isEmpty)
+                                          ? theme.colorScheme.onSurfaceVariant
+                                          : theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                _UserActionsButton(user: user),
+                              ),
+                            ],
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        leading: CircleAvatar(
-          radius: 24,
+      ),
+    );
+  }
+}
+
+class _UserIdentityCell extends StatelessWidget {
+  const _UserIdentityCell({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          radius: 20,
           backgroundColor: theme.colorScheme.primaryContainer,
-          backgroundImage: user.photoUrl != null 
-              ? NetworkImage(user.photoUrl!) 
-              : null,
+          backgroundImage:
+              user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
           child: user.photoUrl == null
               ? Text(
                   user.email[0].toUpperCase(),
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimaryContainer,
                   ),
                 )
               : null,
         ),
-        title: Text(
-          user.displayName ?? user.email,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        const SizedBox(width: 12),
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: 180,
+            maxWidth: 240,
+          ),
+          child: Text(
+            user.displayName ?? user.email,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(user.email),
-            if (user.phoneNumber != null) ...[
-              const SizedBox(height: 2),
-              Text(user.phoneNumber!),
-            ],
-          ],
+      ],
+    );
+  }
+}
+
+class _UserActionsButton extends ConsumerWidget {
+  const _UserActionsButton({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      tooltip: 'User actions',
+      onSelected: (value) async {
+        switch (value) {
+          case 'view':
+            _showUserSummaryDialog(context, user);
+            break;
+          case 'edit':
+            await _showEditUserDialog(context, ref, user);
+            break;
+          case 'deactivate':
+            await _confirmDeactivate(context, ref, user);
+            break;
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem<String>(
+          value: 'view',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.visibility),
+            title: Text('View Profile'),
+          ),
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.more_vert),
-          onPressed: () {
-            // Show options menu
-            _showUserOptions(context, ref, user);
-          },
+        PopupMenuItem<String>(
+          value: 'edit',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.edit),
+            title: Text('Edit User'),
+          ),
         ),
+        PopupMenuItem<String>(
+          value: 'deactivate',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.block, color: Colors.red),
+            title: Text('Deactivate User'),
+          ),
+        ),
+      ],
+      child: const Padding(
+        padding: EdgeInsets.all(8),
+        child: Icon(Icons.more_vert),
       ),
     );
   }
 
-  void _showUserOptions(BuildContext context, WidgetRef ref, UserModel user) {
-    showModalBottomSheet(
+  void _showUserSummaryDialog(BuildContext context, UserModel user) {
+    showDialog<void>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
+      builder: (context) => AlertDialog(
+        title: const Text('User Profile'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: const Icon(Icons.visibility),
-              title: const Text('View Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to user profile
-              },
+            _ProfileLine(label: 'Name', value: user.displayName ?? 'Not set'),
+            const SizedBox(height: 10),
+            _ProfileLine(label: 'Email', value: user.email),
+            const SizedBox(height: 10),
+            _ProfileLine(
+              label: 'Phone',
+              value: (user.phoneNumber == null || user.phoneNumber!.trim().isEmpty)
+                  ? 'Not set'
+                  : user.phoneNumber!,
             ),
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit User'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditUserDialog(context, ref, user);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: const Text('Deactivate User'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDeactivate(context, ref, user);
-              },
+            const SizedBox(height: 10),
+            _ProfileLine(
+              label: 'Role',
+              value: user.role.name[0].toUpperCase() + user.role.name.substring(1),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -388,6 +555,41 @@ class _UserCard extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _ProfileLine extends StatelessWidget {
+  const _ProfileLine({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

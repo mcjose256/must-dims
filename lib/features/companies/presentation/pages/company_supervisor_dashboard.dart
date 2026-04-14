@@ -5,24 +5,24 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dims/core/widgets/brand_app_bar_title.dart';
 
-import '../../../logbook/data/models/weekly_logbook_summary_model.dart';
-import '../../../supervisor/presentation/screens/weekly_summary_review_screen.dart';
+import '../../../logbook/data/models/logbook_entry_model.dart';
+import 'logbook_review_page.dart';
 import '../../controllers/company_supervisor_controller.dart';
 
 // ============================================================================
-// PROVIDER: Pending Weekly Summaries for Company Supervisor
+// PROVIDER: Pending Weekly Logbooks for Company Supervisor
 // ============================================================================
 
-final pendingCompanyWeeklyReviewsProvider = StreamProvider<List<WeeklyLogbookSummaryModel>>((ref) {
+final pendingCompanyWeeklyReviewsProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
   final authState = FirebaseAuth.instance.currentUser;
   final userId = authState?.uid;
-  
+
   if (userId == null) return Stream.value([]);
 
   return FirebaseFirestore.instance
-      .collection('weeklyLogbookSummaries')
-      .where('status', isEqualTo: 'submitted')
-      .orderBy('weekNumber', descending: true)
+      .collection('logbookEntries')
+      .where('isReviewedByCompanySupervisor', isEqualTo: false)
       .snapshots()
       .asyncMap((snapshot) async {
         // Get placements where this company supervisor is assigned
@@ -31,25 +31,48 @@ final pendingCompanyWeeklyReviewsProvider = StreamProvider<List<WeeklyLogbookSum
             .where('companySupervisorId', isEqualTo: userId)
             .get();
 
-        final placementIds = placementsSnapshot.docs.map((doc) => doc.id).toList();
+        final placementsById = {
+          for (final doc in placementsSnapshot.docs) doc.id: doc.data(),
+        };
 
-        // Filter summaries
-        return snapshot.docs
-            .map((doc) => WeeklyLogbookSummaryModel.fromFirestore(doc, null))
-            .where((summary) => 
-                placementIds.contains(summary.placementId) &&
-                !summary.isReviewedByCompanySupervisor)
+        final pendingEntries = snapshot.docs
+            .map((doc) => LogbookEntryModel.fromFirestore(doc, null))
+            .where((entry) {
+              final status = entry.status.toLowerCase();
+              return placementsById.containsKey(entry.placementId) &&
+                  status != 'draft' &&
+                  status != 'rejected';
+            })
+            .toList()
+          ..sort((a, b) => b.weekNumber.compareTo(a.weekNumber));
+
+        final studentCache = <String, Map<String, dynamic>?>{};
+        for (final entry in pendingEntries) {
+          if (studentCache.containsKey(entry.studentId)) continue;
+          final studentDoc = await FirebaseFirestore.instance
+              .collection('students')
+              .doc(entry.studentId)
+              .get();
+          studentCache[entry.studentId] = studentDoc.data();
+        }
+
+        return pendingEntries
+            .map<Map<String, dynamic>>((entry) => {
+                  'entry': entry,
+                  'student': studentCache[entry.studentId],
+                  'placement': placementsById[entry.placementId],
+                })
             .toList();
       })
       .handleError((e) {
         print('[PendingCompanyReviews] Error: $e');
-        return <WeeklyLogbookSummaryModel>[];
+        return <Map<String, dynamic>>[];
       });
 });
 
 final pendingCompanyReviewsCountProvider = Provider<int>((ref) {
-  final summaries = ref.watch(pendingCompanyWeeklyReviewsProvider).value ?? [];
-  return summaries.length;
+  final entries = ref.watch(pendingCompanyWeeklyReviewsProvider).value ?? [];
+  return entries.length;
 });
 
 // ============================================================================
@@ -70,8 +93,7 @@ class CompanySupervisorDashboard extends ConsumerWidget {
 
     final supervisorAsync = ref.watch(companySupervisorProvider(user.uid));
     final studentsAsync = ref.watch(companySupervisorStudentsProvider);
-    final pendingLogbooksAsync = ref.watch(pendingLogbookReviewsProvider);
-    final pendingWeeklySummariesAsync = ref.watch(pendingCompanyWeeklyReviewsProvider);
+    final pendingWeeklyLogbooksAsync = ref.watch(pendingCompanyWeeklyReviewsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -102,7 +124,6 @@ class CompanySupervisorDashboard extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(companySupervisorProvider(user.uid));
               ref.invalidate(companySupervisorStudentsProvider);
-              ref.invalidate(pendingLogbookReviewsProvider);
               ref.invalidate(pendingCompanyWeeklyReviewsProvider);
             },
             child: SingleChildScrollView(
@@ -176,13 +197,13 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 32),
 
-                  // Pending Weekly Reviews Section (NEW)
+                  // Pending Weekly Logbooks Section
                   Row(
                     children: [
-                      Icon(Icons.summarize, color: Theme.of(context).colorScheme.primary),
+                      Icon(Icons.menu_book, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 12),
                       Text(
-                        'Pending Weekly Reviews',
+                        'Pending Weekly Logbooks',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -190,9 +211,9 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  pendingWeeklySummariesAsync.when(
-                    data: (summaries) {
-                      if (summaries.isEmpty) {
+                  pendingWeeklyLogbooksAsync.when(
+                    data: (entries) {
+                      if (entries.isEmpty) {
                         return Card(
                           child: Padding(
                             padding: const EdgeInsets.all(32),
@@ -206,7 +227,7 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'No pending weekly reviews',
+                                    'No pending weekly logbooks',
                                     style: TextStyle(
                                       color: Colors.green.shade700,
                                       fontWeight: FontWeight.bold,
@@ -214,7 +235,7 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'All weekly summaries have been reviewed',
+                                    'All submitted weekly logbooks have been reviewed',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -228,14 +249,17 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                       }
 
                       return Column(
-                        children: summaries.map((summary) {
+                        children: entries.map((entryData) {
+                          final entry = entryData['entry'] as LogbookEntryModel;
+                          final student =
+                              entryData['student'] as Map<String, dynamic>?;
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: Colors.orange,
                                 child: Text(
-                                  '${summary.weekNumber}',
+                                  '${entry.weekNumber}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -243,20 +267,19 @@ class CompanySupervisorDashboard extends ConsumerWidget {
                                 ),
                               ),
                               title: Text(
-                                'Week ${summary.weekNumber} Summary',
+                                student?['fullName'] ?? 'Week ${entry.weekNumber}',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                '${summary.totalHoursWorked} hours • ${summary.dailyEntryIds.length} days',
+                                'Week ${entry.weekNumber} • ${entry.hoursWorked.toStringAsFixed(entry.hoursWorked.truncateToDouble() == entry.hoursWorked ? 0 : 1)} hours',
                               ),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => WeeklySummaryReviewScreen(
-                                      summary: summary,
-                                      isCompanySupervisor: true,
+                                    builder: (_) => LogbookReviewPage(
+                                      logbookId: entry.id!,
                                     ),
                                   ),
                                 );

@@ -92,28 +92,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-     // await ref.read(authControllerProvider).signInWithGoogle();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception:', '').trim()),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final badgeSize = screenWidth < 380 ? 96.0 : 110.0;
+    final badgePadding = badgeSize * 0.18;
     
     return Scaffold(
       body: SafeArea(
@@ -126,31 +111,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  GestureDetector(
-                    onLongPress: _createDevAdmin,
-                    child: Container(
-                      width: 118,
-                      height: 118,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colorScheme.secondary.withOpacity(0.65),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.12),
-                            blurRadius: 18,
-                            offset: const Offset(0, 10),
+                  Center(
+                    child: GestureDetector(
+                      onLongPress: _createDevAdmin,
+                      child: Container(
+                        width: badgeSize,
+                        height: badgeSize,
+                        padding: EdgeInsets.all(badgePadding),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: colorScheme.secondary.withOpacity(0.55),
+                            width: 2,
                           ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/icons/must logo.png',
-                          fit: BoxFit.contain,
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.10),
+                              blurRadius: 18,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          clipBehavior: Clip.antiAlias,
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: Padding(
+                              padding: EdgeInsets.all(badgeSize * 0.06),
+                              child: Image.asset(
+                                'assets/icons/must logo.png',
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -212,19 +207,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     child: _isLoading
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Text('Sign In', style: TextStyle(fontSize: 16)),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Google Sign In
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _signInWithGoogle,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.login), 
-                    label: const Text('Sign in with Google'),
                   ),
 
                   const SizedBox(height: 32),

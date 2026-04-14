@@ -69,6 +69,23 @@ class DistrictAllocationStat {
   });
 }
 
+int _countApprovedOrImportedProfiles({
+  required QuerySnapshot<Map<String, dynamic>> profilesSnapshot,
+  required QuerySnapshot<Map<String, dynamic>> usersSnapshot,
+}) {
+  final usersById = {
+    for (final doc in usersSnapshot.docs) doc.id: doc.data(),
+  };
+
+  return profilesSnapshot.docs.where((profileDoc) {
+    final userData = usersById[profileDoc.id];
+    if (userData == null) return true;
+
+    final isApproved = userData['isApproved'];
+    return isApproved is bool ? isApproved : true;
+  }).length;
+}
+
 // ============================================================================
 // PROVIDERS
 // ============================================================================
@@ -78,25 +95,19 @@ final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
   final firestore = ref.watch(firestoreProvider);
   
   try {
-    // Fetch all counts in parallel for better performance
+    // Align overview counts with the operational profile collections while
+    // still respecting approval state when a matching user account exists.
     final results = await Future.wait([
-      // Total approved students
+      firestore.collection('students').get(),
       firestore
           .collection('users')
           .where('role', isEqualTo: 'student')
-          .where('isApproved', isEqualTo: true)
-          .count()
           .get(),
-      
-      // Total approved supervisors
+      firestore.collection('supervisorProfiles').get(),
       firestore
           .collection('users')
           .where('role', isEqualTo: 'supervisor')
-          .where('isApproved', isEqualTo: true)
-          .count()
           .get(),
-      
-      // Pending approvals (all roles)
       firestore
           .collection('users')
           .where('isApproved', isEqualTo: false)
@@ -104,9 +115,15 @@ final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
           .get(),
     ]);
 
-    final totalStudents = results[0].count ?? 0;
-    final totalSupervisors = results[1].count ?? 0;
-    final pendingApprovals = results[2].count ?? 0;
+    final totalStudents = _countApprovedOrImportedProfiles(
+      profilesSnapshot: results[0] as QuerySnapshot<Map<String, dynamic>>,
+      usersSnapshot: results[1] as QuerySnapshot<Map<String, dynamic>>,
+    );
+    final totalSupervisors = _countApprovedOrImportedProfiles(
+      profilesSnapshot: results[2] as QuerySnapshot<Map<String, dynamic>>,
+      usersSnapshot: results[3] as QuerySnapshot<Map<String, dynamic>>,
+    );
+    final pendingApprovals = (results[4] as AggregateQuerySnapshot).count ?? 0;
 
     final placementsSnapshot = await firestore.collection('placements').get();
     final companiesSnapshot = await firestore.collection('companies').count().get();

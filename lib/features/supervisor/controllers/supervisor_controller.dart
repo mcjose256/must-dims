@@ -1,5 +1,6 @@
 // lib/features/supervisor/controllers/supervisor_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../logbook/data/models/logbook_entry_model.dart';
 import '../../evaluations/data/models/evaluation_model.dart';
@@ -11,6 +12,7 @@ final supervisorControllerProvider =
 
 class SupervisorController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // ============================================================================
   // PLACEMENT LETTER REVIEW
@@ -106,17 +108,52 @@ class SupervisorController {
   // ============================================================================
 
   Future<void> approveLogbookEntry(String entryId, String comment) async {
-    await _firestore.collection('logbook_entries').doc(entryId).update({
+    await _firestore.collection('logbookEntries').doc(entryId).update({
       'status': 'approved',
-      'supervisorComment': comment,
-      'approvedAt': FieldValue.serverTimestamp(),
+      'isReviewedByUniversitySupervisor': true,
+      'universitySupervisorComment': comment.trim(),
+      'universityReviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
   Future<void> rejectLogbookEntry(String entryId, String comment) async {
-    await _firestore.collection('logbook_entries').doc(entryId).update({
+    await _firestore.collection('logbookEntries').doc(entryId).update({
       'status': 'rejected',
-      'supervisorComment': comment,
+      'isReviewedByUniversitySupervisor': true,
+      'universitySupervisorComment': comment.trim(),
+      'universityReviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> approveFinalReport({
+    required String reportId,
+    String? feedback,
+  }) async {
+    await _firestore.collection('internshipReports').doc(reportId).update({
+      'status': 'approved',
+      'supervisorFeedback':
+          feedback != null && feedback.trim().isNotEmpty ? feedback.trim() : null,
+      'reviewedBy': _auth.currentUser?.uid,
+      'reviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> rejectFinalReport({
+    required String reportId,
+    required String feedback,
+  }) async {
+    if (feedback.trim().isEmpty) {
+      throw Exception('Feedback is required when returning a report.');
+    }
+
+    await _firestore.collection('internshipReports').doc(reportId).update({
+      'status': 'rejected',
+      'supervisorFeedback': feedback.trim(),
+      'reviewedBy': _auth.currentUser?.uid,
+      'reviewedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -126,7 +163,21 @@ class SupervisorController {
   // ============================================================================
 
   Future<void> submitEvaluation(EvaluationModel eval) async {
-    await _firestore.collection('evaluations').add({
+    if (eval.placementId.trim().isEmpty) {
+      throw Exception('A placement must exist before submitting evaluation.');
+    }
+
+    final existingEvaluation = await _firestore
+        .collection('evaluations')
+        .where('placementId', isEqualTo: eval.placementId)
+        .where('evaluatorType', isEqualTo: eval.evaluatorType.name)
+        .limit(1)
+        .get();
+
+    final existingDoc =
+        existingEvaluation.docs.isEmpty ? null : existingEvaluation.docs.first;
+    final existingCreatedAt = existingDoc?.data()['createdAt'];
+    final payload = {
       'studentId': eval.studentId,
       'placementId': eval.placementId,
       'evaluatorType': eval.evaluatorType.name,
@@ -148,9 +199,16 @@ class SupervisorController {
       'recommendationsForFutureInterns': eval.recommendationsForFutureInterns,
       'wouldHireAgain': eval.wouldHireAgain,
       'hiringConditions': eval.hiringConditions,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': existingCreatedAt ?? FieldValue.serverTimestamp(),
       'submittedAt': FieldValue.serverTimestamp(),
-    });
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (existingDoc == null) {
+      await _firestore.collection('evaluations').add(payload);
+    } else {
+      await existingDoc.reference.set(payload, SetOptions(merge: true));
+    }
   }
 
   // ============================================================================
@@ -174,9 +232,8 @@ class SupervisorController {
 
   Stream<List<LogbookEntryModel>> getPendingLogbooks(String supervisorId) {
     return _firestore
-        .collection('logbook_entries')
-        .where('supervisorId', isEqualTo: supervisorId)
-        .where('status', isEqualTo: 'pending')
+        .collection('logbookEntries')
+        .where('isReviewedByUniversitySupervisor', isEqualTo: false)
         .snapshots()
         .map((snap) => snap.docs
             .map((doc) => LogbookEntryModel.fromFirestore(doc, null))

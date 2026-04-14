@@ -121,7 +121,7 @@ class AuthController {
         'fullName': fullName,
         'email': email,
         'department': department,
-        'maxStudents': 12,
+        'maxStudents': 15,
         'currentLoad': 0,
         'isAvailable': true,
         'assignedStudentIds': [],

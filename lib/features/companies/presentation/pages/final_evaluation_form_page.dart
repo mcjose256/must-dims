@@ -110,8 +110,20 @@ class _FinalEvaluationFormPageState
       final daysAbsent = int.tryParse(_daysAbsentController.text.trim()) ?? 0;
       final totalDays = daysPresent + daysAbsent;
 
-      // Create evaluation
-      await FirebaseFirestore.instance.collection('evaluations').add({
+      final existingEvaluation = await FirebaseFirestore.instance
+          .collection('evaluations')
+          .where('placementId', isEqualTo: widget.placementId)
+          .where(
+            'evaluatorType',
+            isEqualTo: EvaluationType.companySupervisor.name,
+          )
+          .limit(1)
+          .get();
+
+      final existingDoc =
+          existingEvaluation.docs.isEmpty ? null : existingEvaluation.docs.first;
+      final existingCreatedAt = existingDoc?.data()['createdAt'];
+      final evaluationPayload = {
         'placementId': widget.placementId,
         'studentId': widget.studentId,
         'evaluatorType': EvaluationType.companySupervisor.name,
@@ -142,9 +154,22 @@ class _FinalEvaluationFormPageState
         'hiringConditions': _hiringConditionsController.text.trim().isEmpty
             ? null
             : _hiringConditionsController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': existingCreatedAt ?? FieldValue.serverTimestamp(),
         'submittedAt': FieldValue.serverTimestamp(),
-      });
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Create evaluation
+      if (existingDoc == null) {
+        await FirebaseFirestore.instance
+            .collection('evaluations')
+            .add(evaluationPayload);
+      } else {
+        await existingDoc.reference.set(
+          evaluationPayload,
+          SetOptions(merge: true),
+        );
+      }
 
       // Update placement status
       await FirebaseFirestore.instance
@@ -152,7 +177,17 @@ class _FinalEvaluationFormPageState
           .doc(widget.placementId)
           .update({
         'status': 'completed',
+        'progressPercentage': 1.0,
         'actualEndDate': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await FirebaseFirestore.instance
+          .collection('students')
+          .doc(widget.studentId)
+          .update({
+        'internshipStatus': 'completed',
+        'progressPercentage': 100.0,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 

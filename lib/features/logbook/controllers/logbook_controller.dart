@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../auth/controllers/auth_controller.dart';
 import '../data/models/daily_logbook_entry_model.dart';
 import '../data/models/weekly_logbook_summary_model.dart';
 
@@ -13,63 +14,75 @@ final logbookControllerProvider = Provider((ref) => LogbookController(ref));
 
 // Daily entries for current student
 final dailyEntriesProvider = StreamProvider<List<DailyLogbookEntryModel>>((ref) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
+  final authState = ref.watch(authStateProvider);
+  final firestore = ref.watch(firestoreProvider);
+
+  final userId = authState.value?.uid;
   if (userId == null) return Stream.value([]);
 
-  return FirebaseFirestore.instance
+  return firestore
       .collection('dailyLogbookEntries')
-      .where('studentId', isEqualTo: userId)
-      .orderBy('date', descending: true)
       .snapshots()
       .map((snapshot) {
-        return snapshot.docs
+        final entries = snapshot.docs
             .map((doc) => DailyLogbookEntryModel.fromFirestore(doc, null))
-            .toList();
+            .where((entry) => entry.studentId == userId)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+        return entries;
       });
 });
 
 // Weekly summaries for current student
 final weeklySummariesProvider = StreamProvider<List<WeeklyLogbookSummaryModel>>((ref) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
+  final authState = ref.watch(authStateProvider);
+  final firestore = ref.watch(firestoreProvider);
+
+  final userId = authState.value?.uid;
   if (userId == null) return Stream.value([]);
 
-  return FirebaseFirestore.instance
+  return firestore
       .collection('weeklyLogbookSummaries')
-      .where('studentId', isEqualTo: userId)
-      .orderBy('weekNumber', descending: true)
       .snapshots()
       .map((snapshot) {
-        return snapshot.docs
+        final summaries = snapshot.docs
             .map((doc) => WeeklyLogbookSummaryModel.fromFirestore(doc, null))
-            .toList();
+            .where((summary) => summary.studentId == userId)
+            .toList()
+          ..sort((a, b) => b.weekNumber.compareTo(a.weekNumber));
+        return summaries;
       });
 });
 
 // Daily entries for a specific week
 final dailyEntriesForWeekProvider = StreamProvider.family<List<DailyLogbookEntryModel>, int>(
   (ref, weekNumber) {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final authState = ref.watch(authStateProvider);
+    final firestore = ref.watch(firestoreProvider);
+
+    final userId = authState.value?.uid;
     if (userId == null) return Stream.value([]);
 
     // Calculate week date range based on weekNumber
     // This is a simplified version - you may need to adjust based on placement start date
-    return FirebaseFirestore.instance
+    return firestore
         .collection('dailyLogbookEntries')
-        .where('studentId', isEqualTo: userId)
-        .orderBy('dayNumber')
         .snapshots()
         .map((snapshot) {
           final allEntries = snapshot.docs
               .map((doc) => DailyLogbookEntryModel.fromFirestore(doc, null))
+              .where((entry) => entry.studentId == userId)
               .toList();
           
           // Filter entries for this week (5 days per week)
           final startDay = (weekNumber - 1) * 5 + 1;
           final endDay = weekNumber * 5;
           
-          return allEntries.where((entry) {
+          final entriesForWeek = allEntries.where((entry) {
             return entry.dayNumber >= startDay && entry.dayNumber <= endDay;
-          }).toList();
+          }).toList()
+            ..sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+          return entriesForWeek;
         });
   },
 );
@@ -131,15 +144,21 @@ class LogbookController {
     try {
       final snapshot = await _db
           .collection('dailyLogbookEntries')
-          .where('studentId', isEqualTo: studentId)
-          .orderBy('dayNumber', descending: true)
-          .limit(1)
           .get();
 
-      if (snapshot.docs.isEmpty) return 1;
+      final entries = snapshot.docs
+          .map((doc) => DailyLogbookEntryModel.fromFirestore(doc, null))
+          .where((entry) => entry.studentId == studentId)
+          .toList();
 
-      final lastEntry = DailyLogbookEntryModel.fromFirestore(snapshot.docs.first, null);
-      return lastEntry.dayNumber + 1;
+      if (entries.isEmpty) return 1;
+
+      final maxDayNumber = entries.fold<int>(
+        0,
+        (maxValue, entry) =>
+            entry.dayNumber > maxValue ? entry.dayNumber : maxValue,
+      );
+      return maxDayNumber + 1;
     } catch (e) {
       return 1;
     }
@@ -238,15 +257,14 @@ class LogbookController {
 
       final snapshot = await _db
           .collection('dailyLogbookEntries')
-          .where('studentId', isEqualTo: userId)
-          .where('dayNumber', isGreaterThanOrEqualTo: startDay)
-          .where('dayNumber', isLessThanOrEqualTo: endDay)
-          .orderBy('dayNumber')
           .get();
 
       final entries = snapshot.docs
           .map((doc) => DailyLogbookEntryModel.fromFirestore(doc, null))
-          .toList();
+          .where((entry) => entry.studentId == userId)
+          .where((entry) => entry.dayNumber >= startDay && entry.dayNumber <= endDay)
+          .toList()
+        ..sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
 
       if (entries.isEmpty) {
         throw Exception('No daily entries found for week $weekNumber');

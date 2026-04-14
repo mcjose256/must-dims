@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "dims-must"
+  },
+  "targets": {},
+  "etags": {
+    "dims-must": {
+      "extensionInstances": {
+        "firestore-send-email": "a5cf8bca0d0517abbac950de0bd9b98470ae141db6021022da1939381b2b5f07"
+      }
+    }
   }
 }

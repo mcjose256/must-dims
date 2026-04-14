@@ -7,6 +7,8 @@ import '../../placements/data/models/placement_model.dart';
 import '../../companies/data/models/company_model.dart';
 import '../../logbook/data/models/logbook_entry_model.dart';
 import '../../supervisor/data/models/supervisor_profile_model.dart';
+import '../data/models/internship_report_model.dart';
+import '../../evaluations/data/models/evaluation_model.dart';
 
 // ============================================================================
 // STUDENT PROFILE PROVIDERS
@@ -140,17 +142,90 @@ final logbookEntriesProvider = StreamProvider<List<Map<String, dynamic>>>((ref) 
 final pendingLogbookCountProvider = Provider<int>((ref) {
   final entries = ref.watch(logbookEntriesProvider).value ?? [];
   return entries.where((e) {
-    final status = (e['entry'] as LogbookEntryModel?)?.status.toLowerCase();
-    return status == 'pending' || status == 'submitted';
+    final entry = e['entry'] as LogbookEntryModel?;
+    final status = entry?.status.toLowerCase();
+    return status != 'draft' &&
+        status != 'rejected' &&
+        entry?.isReviewedByUniversitySupervisor == false;
   }).length;
 });
 
 final approvedLogbookCountProvider = Provider<int>((ref) {
   final entries = ref.watch(logbookEntriesProvider).value ?? [];
   return entries.where((e) {
-    final status = (e['entry'] as LogbookEntryModel?)?.status.toLowerCase();
-    return status == 'approved';
+    final entry = e['entry'] as LogbookEntryModel?;
+    return entry?.status.toLowerCase() == 'approved';
   }).length;
+});
+
+final finalInternshipReportProvider =
+    StreamProvider<InternshipReportModel?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final firestore = ref.watch(firestoreProvider);
+  final placement = ref.watch(currentPlacementProvider).value;
+
+  final userId = authState.value?.uid;
+  final placementId = placement?.id;
+  if (userId == null || placementId == null) {
+    return Stream.value(null);
+  }
+
+  return firestore
+      .collection('internshipReports')
+      .where('studentId', isEqualTo: userId)
+      .snapshots()
+      .map((snapshot) {
+        final reports = snapshot.docs
+            .map((doc) => InternshipReportModel.fromFirestore(doc, null))
+            .where((report) => report.placementId == placementId)
+            .toList()
+          ..sort((a, b) {
+            final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
+            final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
+            return bDate.compareTo(aDate);
+          });
+
+        if (reports.isEmpty) return null;
+        return reports.first;
+      });
+});
+
+final currentPlacementEvaluationsProvider =
+    StreamProvider<List<EvaluationModel>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final placement = ref.watch(currentPlacementProvider).value;
+
+  if (placement == null) {
+    return Stream.value(const <EvaluationModel>[]);
+  }
+
+  return firestore
+      .collection('evaluations')
+      .where('placementId', isEqualTo: placement.id)
+      .snapshots()
+      .map((snapshot) {
+        final evaluations = snapshot.docs
+            .map((doc) => EvaluationModel.fromFirestore(doc, null))
+            .toList()
+          ..sort((a, b) {
+            final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
+            final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
+            return bDate.compareTo(aDate);
+          });
+        return evaluations;
+      });
+});
+
+final currentPlacementEvaluationsByTypeProvider =
+    Provider<Map<EvaluationType, EvaluationModel>>((ref) {
+  final evaluations = ref.watch(currentPlacementEvaluationsProvider).value ?? [];
+  final byType = <EvaluationType, EvaluationModel>{};
+
+  for (final evaluation in evaluations) {
+    byType.putIfAbsent(evaluation.evaluatorType, () => evaluation);
+  }
+
+  return byType;
 });
 
 // ============================================================================

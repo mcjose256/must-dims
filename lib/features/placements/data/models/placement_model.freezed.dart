@@ -44,6 +44,7 @@ mixin _$PlacementModel {
   DateTime? get supervisorRejectedAt =>
       throw _privateConstructorUsedError; // ── Internship timeline ──────────────────────────────────────────────────
   String get academicYear => throw _privateConstructorUsedError;
+  DateTime? get actualStartDate => throw _privateConstructorUsedError;
   DateTime? get startDate => throw _privateConstructorUsedError;
   DateTime? get endDate => throw _privateConstructorUsedError;
   DateTime? get actualEndDate => throw _privateConstructorUsedError;
@@ -86,6 +87,7 @@ abstract class $PlacementModelCopyWith<$Res> {
       DateTime? supervisorApprovedAt,
       DateTime? supervisorRejectedAt,
       String academicYear,
+      DateTime? actualStartDate,
       DateTime? startDate,
       DateTime? endDate,
       DateTime? actualEndDate,
@@ -127,6 +129,7 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
     Object? supervisorApprovedAt = freezed,
     Object? supervisorRejectedAt = freezed,
     Object? academicYear = null,
+    Object? actualStartDate = freezed,
     Object? startDate = freezed,
     Object? endDate = freezed,
     Object? actualEndDate = freezed,
@@ -203,6 +206,10 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
           ? _value.academicYear
           : academicYear // ignore: cast_nullable_to_non_nullable
               as String,
+      actualStartDate: freezed == actualStartDate
+          ? _value.actualStartDate
+          : actualStartDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       startDate: freezed == startDate
           ? _value.startDate
           : startDate // ignore: cast_nullable_to_non_nullable
@@ -272,6 +279,7 @@ abstract class _$$PlacementModelImplCopyWith<$Res>
       DateTime? supervisorApprovedAt,
       DateTime? supervisorRejectedAt,
       String academicYear,
+      DateTime? actualStartDate,
       DateTime? startDate,
       DateTime? endDate,
       DateTime? actualEndDate,
@@ -311,6 +319,7 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
     Object? supervisorApprovedAt = freezed,
     Object? supervisorRejectedAt = freezed,
     Object? academicYear = null,
+    Object? actualStartDate = freezed,
     Object? startDate = freezed,
     Object? endDate = freezed,
     Object? actualEndDate = freezed,
@@ -387,6 +396,10 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
           ? _value.academicYear
           : academicYear // ignore: cast_nullable_to_non_nullable
               as String,
+      actualStartDate: freezed == actualStartDate
+          ? _value.actualStartDate
+          : actualStartDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       startDate: freezed == startDate
           ? _value.startDate
           : startDate // ignore: cast_nullable_to_non_nullable
@@ -451,6 +464,7 @@ class _$PlacementModelImpl implements _PlacementModel {
       this.supervisorApprovedAt,
       this.supervisorRejectedAt,
       required this.academicYear,
+      this.actualStartDate,
       this.startDate,
       this.endDate,
       this.actualEndDate,
@@ -507,6 +521,8 @@ class _$PlacementModelImpl implements _PlacementModel {
   @override
   final String academicYear;
   @override
+  final DateTime? actualStartDate;
+  @override
   final DateTime? startDate;
   @override
   final DateTime? endDate;
@@ -534,7 +550,7 @@ class _$PlacementModelImpl implements _PlacementModel {
 
   @override
   String toString() {
-    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, supervisorFeedback: $supervisorFeedback, supervisorApprovedAt: $supervisorApprovedAt, supervisorRejectedAt: $supervisorRejectedAt, academicYear: $academicYear, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, supervisorFeedback: $supervisorFeedback, supervisorApprovedAt: $supervisorApprovedAt, supervisorRejectedAt: $supervisorRejectedAt, academicYear: $academicYear, actualStartDate: $actualStartDate, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -573,6 +589,8 @@ class _$PlacementModelImpl implements _PlacementModel {
                 other.supervisorRejectedAt == supervisorRejectedAt) &&
             (identical(other.academicYear, academicYear) ||
                 other.academicYear == academicYear) &&
+            (identical(other.actualStartDate, actualStartDate) ||
+                other.actualStartDate == actualStartDate) &&
             (identical(other.startDate, startDate) ||
                 other.startDate == startDate) &&
             (identical(other.endDate, endDate) || other.endDate == endDate) &&
@@ -613,6 +631,7 @@ class _$PlacementModelImpl implements _PlacementModel {
         supervisorApprovedAt,
         supervisorRejectedAt,
         academicYear,
+        actualStartDate,
         startDate,
         endDate,
         actualEndDate,
@@ -658,6 +677,7 @@ abstract class _PlacementModel implements PlacementModel {
       final DateTime? supervisorApprovedAt,
       final DateTime? supervisorRejectedAt,
       required final String academicYear,
+      final DateTime? actualStartDate,
       final DateTime? startDate,
       final DateTime? endDate,
       final DateTime? actualEndDate,
@@ -707,6 +727,8 @@ abstract class _PlacementModel implements PlacementModel {
   DateTime? get supervisorRejectedAt;
   @override // ── Internship timeline ──────────────────────────────────────────────────
   String get academicYear;
+  @override
+  DateTime? get actualStartDate;
   @override
   DateTime? get startDate;
   @override

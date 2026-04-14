@@ -23,13 +23,22 @@ class _StudentEvaluationScreenState extends ConsumerState<StudentEvaluationScree
  Future<void> _submit() async {
   final auth = ref.read(authStateProvider).value;
   if (auth == null) return;
+  final placementId = widget.student.currentPlacementId;
+  if (placementId == null || placementId.trim().isEmpty) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No internship placement found for this student.')),
+      );
+    }
+    return;
+  }
 
   // Get supervisor name
   final supervisorName = auth.displayName ?? auth.email ?? 'Unknown Supervisor';
 
   final eval = EvaluationModel(
     studentId: widget.student.uid,
-    placementId: widget.student.currentPlacementId ?? '', // Add placement ID
+    placementId: placementId,
     evaluatorType: EvaluationType.universitySupervisor,
     evaluatorId: auth.uid,
     evaluatorName: supervisorName,

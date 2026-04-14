@@ -54,6 +54,7 @@ class PlacementModel with _$PlacementModel {
 
     // ── Internship timeline ──────────────────────────────────────────────────
     required String academicYear,
+    DateTime? actualStartDate,
     DateTime? startDate,
     DateTime? endDate,
     DateTime? actualEndDate,
@@ -90,6 +91,12 @@ class PlacementModel with _$PlacementModel {
       return null;
     }
 
+    String? normalizeOptionalText(dynamic value) {
+      if (value == null) return null;
+      final trimmed = value.toString().trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
     // ── Legacy migration: map old 'pending' status to new name ──────────────
     final rawStatus = data['status'] as String?;
     final migratedStatus =
@@ -99,12 +106,21 @@ class PlacementModel with _$PlacementModel {
       ...data,
       'id': doc.id,
       'status': migratedStatus,
+      'companySupervisorName':
+          normalizeOptionalText(data['companySupervisorName']),
+      'companySupervisorEmail':
+          normalizeOptionalText(data['companySupervisorEmail']),
+      'companySupervisorPhone':
+          normalizeOptionalText(data['companySupervisorPhone']),
+      'companySupervisorId':
+          normalizeOptionalText(data['companySupervisorId']),
       'letterUploadedAt':
           parseDate(data['letterUploadedAt'])?.toIso8601String(),
       'supervisorApprovedAt':
           parseDate(data['supervisorApprovedAt'])?.toIso8601String(),
       'supervisorRejectedAt':
           parseDate(data['supervisorRejectedAt'])?.toIso8601String(),
+      'actualStartDate': parseDate(data['actualStartDate'])?.toIso8601String(),
       'startDate': parseDate(data['startDate'])?.toIso8601String(),
       'endDate': parseDate(data['endDate'])?.toIso8601String(),
       'actualEndDate': parseDate(data['actualEndDate'])?.toIso8601String(),
@@ -127,6 +143,7 @@ class PlacementModel with _$PlacementModel {
     setTimestamp('letterUploadedAt', placement.letterUploadedAt);
     setTimestamp('supervisorApprovedAt', placement.supervisorApprovedAt);
     setTimestamp('supervisorRejectedAt', placement.supervisorRejectedAt);
+    setTimestamp('actualStartDate', placement.actualStartDate);
     setTimestamp('startDate', placement.startDate);
     setTimestamp('endDate', placement.endDate);
     setTimestamp('actualEndDate', placement.actualEndDate);
@@ -136,5 +153,72 @@ class PlacementModel with _$PlacementModel {
     json['status'] = placement.status.name;
 
     return json;
+  }
+}
+
+extension PlacementTimelineX on PlacementModel {
+  bool get hasActiveCountdownReminder =>
+      status == PlacementStatus.active || status == PlacementStatus.extended;
+
+  bool get isFinalAssessmentUnlocked {
+    if (status == PlacementStatus.completed) {
+      return true;
+    }
+
+    if (weeksCompleted >= totalWeeks && totalWeeks > 0) {
+      return true;
+    }
+
+    final end = effectiveReminderEndDate;
+    if (end == null) {
+      return false;
+    }
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final endDateOnly = DateTime(end.year, end.month, end.day);
+    return !todayDate.isBefore(endDateOnly);
+  }
+
+  DateTime? get effectiveReminderStartDate => actualStartDate ?? startDate;
+
+  DateTime? get effectiveReminderEndDate {
+    if (actualEndDate != null) {
+      return actualEndDate;
+    }
+    if (endDate != null) {
+      return endDate;
+    }
+
+    final start = effectiveReminderStartDate;
+    if (start == null) {
+      return null;
+    }
+
+    return start.add(Duration(days: totalWeeks * 7));
+  }
+
+  int? get internshipDaysLeft {
+    final end = effectiveReminderEndDate;
+    if (end == null) {
+      return null;
+    }
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final endDateOnly = DateTime(end.year, end.month, end.day);
+    return endDateOnly.difference(todayDate).inDays;
+  }
+
+  int? get internshipDaysElapsed {
+    final start = effectiveReminderStartDate;
+    if (start == null) {
+      return null;
+    }
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final startDateOnly = DateTime(start.year, start.month, start.day);
+    return todayDate.difference(startDateOnly).inDays;
   }
 }

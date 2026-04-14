@@ -91,6 +91,46 @@ final placementStatusBannerProvider = Provider<_BannerData?>((ref) {
             route: '/student/start-internship',
           );
 
+        case PlacementStatus.active:
+        case PlacementStatus.extended:
+          final daysLeft = placement.internshipDaysLeft;
+          if (daysLeft == null) {
+            return null;
+          }
+
+          if (daysLeft < 0) {
+            return const _BannerData(
+              status: 'activeCountdown',
+              title: 'Internship Timeline Overdue',
+              subtitle: 'Your planned internship end date has passed. Update your logbook and check with your supervisor if you need an extension.',
+              color: Colors.red,
+              icon: Icons.warning_amber_rounded,
+            );
+          }
+
+          if (daysLeft == 0) {
+            return const _BannerData(
+              status: 'activeCountdown',
+              title: 'Final Day Of Internship',
+              subtitle: 'Wrap up your remaining work today and make sure your logbook is fully updated.',
+              color: Colors.deepOrange,
+              icon: Icons.event_available_rounded,
+            );
+          }
+
+          final isUrgent = daysLeft <= 7;
+          return _BannerData(
+            status: 'activeCountdown',
+            title: '$daysLeft day${daysLeft == 1 ? '' : 's'} left to complete internship',
+            subtitle: isUrgent
+                ? 'Your internship is close to the finish line. Keep your daily and weekly logbooks up to date.'
+                : 'Stay consistent with your internship tasks and keep your logbook updated as you progress.',
+            color: isUrgent ? Colors.deepOrange : Colors.blue,
+            icon: isUrgent
+                ? Icons.notifications_active_rounded
+                : Icons.timer_outlined,
+          );
+
         default:
           // active, completed, extended, etc. — no banner needed
           return null;
@@ -111,7 +151,7 @@ class _BannerData {
   final String subtitle;
   final Color color;
   final IconData icon;
-  final String route;
+  final String? route;
 
   const _BannerData({
     required this.status,
@@ -119,7 +159,7 @@ class _BannerData {
     required this.subtitle,
     required this.color,
     required this.icon,
-    required this.route,
+    this.route,
   });
 }
 
@@ -236,9 +276,7 @@ class _PlacementStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go(data.route),
-      child: AnimatedContainer(
+    final bannerChild = AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -284,7 +322,7 @@ class _PlacementStatusBanner extends StatelessWidget {
                       color: Colors.grey.shade700,
                       height: 1.3,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -294,7 +332,7 @@ class _PlacementStatusBanner extends StatelessWidget {
 
             // ── Chevron — signals tappability ────────────────────────────
             // Hidden for 'pending' since there's nothing to act on yet.
-            if (data.status != 'pendingSupervisorReview')
+            if (data.route != null && data.status != 'pendingSupervisorReview')
               Icon(Icons.arrow_forward_ios_rounded,
                   color: data.color, size: 14),
 
@@ -303,7 +341,15 @@ class _PlacementStatusBanner extends StatelessWidget {
               _PulsingDot(color: data.color),
           ],
         ),
-      ),
+    );
+
+    if (data.route == null) {
+      return bannerChild;
+    }
+
+    return GestureDetector(
+      onTap: () => context.go(data.route!),
+      child: bannerChild,
     );
   }
 }

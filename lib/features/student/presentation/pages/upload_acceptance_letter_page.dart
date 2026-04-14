@@ -1,4 +1,5 @@
 // lib/features/student/presentation/pages/upload_acceptance_letter_page.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dims/core/widgets/brand_app_bar_title.dart';
+import 'package:dims/features/auth/controllers/auth_controller.dart';
 
 import '../../../companies/data/models/company_model.dart';
 import '../../../placements/data/models/placement_model.dart';
@@ -16,16 +18,33 @@ import '../../../placements/data/models/placement_model.dart';
 // PROVIDERS
 // ============================================================================
 
-final companiesListProvider = StreamProvider<List<CompanyModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('companies')
-      .where('isActive', isEqualTo: true)
-      .where('acceptingInterns', isEqualTo: true)
-      .orderBy('name')
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          .map((doc) => CompanyModel.fromFirestore(doc, null))
-          .toList());
+final companiesListProvider =
+    StreamProvider.autoDispose<List<CompanyModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+
+  if (authState.isLoading) {
+    final controller = StreamController<List<CompanyModel>>();
+    ref.onDispose(controller.close);
+    return controller.stream;
+  }
+
+  if (FirebaseAuth.instance.currentUser == null) {
+    return Stream.value(const <CompanyModel>[]);
+  }
+
+  return FirebaseFirestore.instance.collection('companies').snapshots().map((
+    snapshot,
+  ) {
+    final companies = snapshot.docs
+        .map((doc) => CompanyModel.fromFirestore(doc, null))
+        .where((company) => company.isActive && company.acceptingInterns)
+        .toList()
+      ..sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+
+    return companies;
+  });
 });
 
 // ============================================================================
@@ -135,12 +154,8 @@ class _UploadAcceptanceLetterPageState
           _showError('Please select a company to continue.');
           return false;
         }
-        if (_supervisorNameController.text.trim().isEmpty) {
-          _showError('Please enter the company supervisor\'s full name.');
-          return false;
-        }
-        if (_supervisorEmailController.text.trim().isEmpty ||
-            !_supervisorEmailController.text.contains('@')) {
+        final supervisorEmail = _supervisorEmailController.text.trim();
+        if (supervisorEmail.isNotEmpty && !supervisorEmail.contains('@')) {
           _showError('Please enter a valid company supervisor email.');
           return false;
         }
@@ -409,6 +424,10 @@ class _UploadAcceptanceLetterPageState
       final endDate =
           _selectedStartDate?.add(Duration(days: totalWeeks * 7));
 
+      final supervisorName = _supervisorNameController.text.trim();
+      final supervisorEmail = _supervisorEmailController.text.trim();
+      final supervisorPhone = _supervisorPhoneController.text.trim();
+
       // 4. Create placement document
       // Status is now 'pendingSupervisorReview' — goes to university supervisor,
       // NOT admin. Admin is no longer in the acceptance letter approval chain.
@@ -417,12 +436,12 @@ class _UploadAcceptanceLetterPageState
         'studentId': user.uid,
         'companyId': _selectedCompanyId,
         'universitySupervisorId': universitySupervisorId,
-        'companySupervisorName': _supervisorNameController.text.trim(),
-        'companySupervisorEmail': _supervisorEmailController.text.trim(),
+        'companySupervisorName':
+            supervisorName.isEmpty ? null : supervisorName,
+        'companySupervisorEmail':
+            supervisorEmail.isEmpty ? null : supervisorEmail,
         'companySupervisorPhone':
-            _supervisorPhoneController.text.trim().isEmpty
-                ? null
-                : _supervisorPhoneController.text.trim(),
+            supervisorPhone.isEmpty ? null : supervisorPhone,
         'companySupervisorId': null,
         'acceptanceLetterUrl': downloadUrl,
         'acceptanceLetterFileName': _fileName,
@@ -879,25 +898,43 @@ class _UploadAcceptanceLetterPageState
               );
             },
             loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('Error loading companies: $e'),
+            error: (e, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Company list unavailable. Refresh and try again.',
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => ref.invalidate(companiesListProvider),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 28),
           _SectionHeader(
             icon: Icons.person_outline,
             title: 'Company Supervisor Details',
-            subtitle: 'Enter the details of your supervisor at the company',
+            subtitle:
+                'Add your company supervisor details if you already have them',
           ),
           const SizedBox(height: 16),
           _StyledTextField(
             controller: _supervisorNameController,
-            label: 'Supervisor Full Name *',
+            label: 'Supervisor Full Name (Optional)',
             icon: Icons.badge_outlined,
             keyboardType: TextInputType.name,
           ),
           const SizedBox(height: 14),
           _StyledTextField(
             controller: _supervisorEmailController,
-            label: 'Supervisor Email *',
+            label: 'Supervisor Email (Optional)',
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
           ),
@@ -1102,8 +1139,12 @@ class _UploadAcceptanceLetterPageState
             icon: Icons.person,
             color: Colors.purple,
             items: {
-              'Name': _supervisorNameController.text.trim(),
-              'Email': _supervisorEmailController.text.trim(),
+              'Name': _supervisorNameController.text.trim().isEmpty
+                  ? 'Not provided'
+                  : _supervisorNameController.text.trim(),
+              'Email': _supervisorEmailController.text.trim().isEmpty
+                  ? 'Not provided'
+                  : _supervisorEmailController.text.trim(),
               if (_supervisorPhoneController.text.trim().isNotEmpty)
                 'Phone': _supervisorPhoneController.text.trim(),
             },

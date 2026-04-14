@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../student/controllers/student_controllers.dart';
 import '../../data/models/daily_logbook_entry_model.dart';
-import '../../controllers/logbook_controller.dart';
 import '../../controllers/logbook_controller.dart' as logbook_ctrl;
+
 class DailyEntryFormPage extends ConsumerStatefulWidget {
   final DailyLogbookEntryModel? existingEntry;
 
@@ -61,11 +61,12 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
   }
 
   Future<void> _selectDate() async {
+    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now(),
+      firstDate: now.subtract(const Duration(days: 120)),
+      lastDate: now.add(const Duration(days: 30)),
     );
 
     if (picked != null) {
@@ -88,6 +89,26 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
       final placementId = studentProfile.currentPlacementId;
       if (placementId == null || placementId.isEmpty) {
         throw Exception('No active placement');
+      }
+
+      final existingEntriesSnapshot = await FirebaseFirestore.instance
+          .collection('dailyLogbookEntries')
+          .where('studentId', isEqualTo: user.uid)
+          .get();
+
+      final duplicateForDate = existingEntriesSnapshot.docs.any((doc) {
+        if (widget.existingEntry?.id == doc.id) return false;
+        final data = doc.data();
+        if (data['placementId'] != placementId) return false;
+
+        final date = (data['date'] as Timestamp).toDate();
+        return date.year == _selectedDate.year &&
+            date.month == _selectedDate.month &&
+            date.day == _selectedDate.day;
+      });
+
+      if (duplicateForDate) {
+        throw Exception('A daily log already exists for this date');
       }
 
       // Get next day number
@@ -132,8 +153,8 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
           SnackBar(
             content: Text(
               widget.existingEntry != null 
-                  ? 'Daily entry updated!' 
-                  : 'Daily entry submitted!',
+                  ? 'Daily log updated'
+                  : 'Daily log saved',
             ),
             backgroundColor: Colors.green,
           ),
@@ -162,7 +183,9 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingEntry != null ? 'Edit Daily Entry' : 'Daily Work Entry'),
+        title: Text(widget.existingEntry != null
+            ? 'Edit Daily Log'
+            : 'Daily Logbook'),
       ),
       body: _isSubmitting
           ? const Center(
@@ -171,7 +194,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('Submitting entry...'),
+                  Text('Saving daily log...'),
                 ],
               ),
             )
@@ -180,35 +203,9 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
               child: ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  // Info Card
-                  Card(
-                    color: theme.colorScheme.primaryContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: theme.colorScheme.onPrimaryContainer,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Record your daily work activities. Submit one entry per workday.',
-                              style: TextStyle(
-                                color: theme.colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
                   // Date Selector
                   Text(
-                    'Date *',
+                    'Date',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -238,7 +235,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
                   // Tasks Performed
                   Text(
-                    'Tasks Performed Today *',
+                    'Work Done',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -247,7 +244,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                   TextFormField(
                     controller: _tasksController,
                     decoration: const InputDecoration(
-                      hintText: 'Describe what you worked on today...',
+                      hintText: 'What did you work on today?',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 5,
@@ -262,7 +259,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
                   // Hours Worked
                   Text(
-                    'Hours Worked *',
+                    'Hours',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -291,7 +288,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
                   // Challenges (Optional)
                   Text(
-                    'Challenges Faced (Optional)',
+                    'Challenges',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -300,7 +297,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                   TextFormField(
                     controller: _challengesController,
                     decoration: const InputDecoration(
-                      hintText: 'Any difficulties or obstacles?',
+                      hintText: 'Any blockers or issues?',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 3,
@@ -309,7 +306,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
                   // Skills Learned (Optional)
                   Text(
-                    'Skills Learned (Optional)',
+                    'Skills',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -318,7 +315,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                   TextFormField(
                     controller: _skillsController,
                     decoration: const InputDecoration(
-                      hintText: 'New skills or knowledge gained?',
+                      hintText: 'Skills gained today',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 3,
@@ -327,7 +324,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
 
                   // Notes (Optional)
                   Text(
-                    'Additional Notes (Optional)',
+                    'Notes',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -336,7 +333,7 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                   TextFormField(
                     controller: _notesController,
                     decoration: const InputDecoration(
-                      hintText: 'Any other observations or thoughts?',
+                      hintText: 'Anything else to note',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 3,
@@ -352,7 +349,9 @@ class _DailyEntryFormPageState extends ConsumerState<DailyEntryFormPage> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: Text(
-                        widget.existingEntry != null ? 'Update Entry' : 'Submit Daily Entry',
+                        widget.existingEntry != null
+                            ? 'Update Daily Log'
+                            : 'Save Daily Log',
                       ),
                     ),
                   ),

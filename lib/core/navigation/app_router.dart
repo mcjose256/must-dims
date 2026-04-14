@@ -32,6 +32,11 @@ import 'package:dims/features/student/presentation/pages/upload_acceptance_lette
 import 'package:dims/features/student/presentation/pages/my_placement_status_page.dart';
 import 'package:dims/features/student/presentation/pages/start_internship_page.dart';
 import 'package:dims/features/student/presentation/pages/enhanced_logbook_form_page.dart';
+import 'package:dims/features/logbook/presentation/pages/daily_entry_form_page.dart';
+import 'package:dims/features/student/presentation/pages/daily_logbook_list_page.dart';
+import 'package:dims/features/student/presentation/pages/final_report_submission_page.dart';
+import 'package:dims/features/student/presentation/pages/student_assessment_page.dart';
+import 'package:dims/features/student/presentation/pages/weekly_logbook_list_page.dart';
 
 // ── Profile completeness check ────────────────────────────────────────────────
 final profileCheckProvider =
@@ -221,6 +226,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/student/submit-logbook',
         builder: (context, state) => const EnhancedLogbookFormPage(),
+      ),
+      GoRoute(
+        path: '/student/submit-daily-logbook',
+        builder: (context, state) => const DailyEntryFormPage(),
+      ),
+      GoRoute(
+        path: '/student/logbook/daily',
+        builder: (context, state) => const DailyLogbookListPage(),
+      ),
+      GoRoute(
+        path: '/student/logbook/weekly',
+        builder: (context, state) => const WeeklyLogbookListPage(),
+      ),
+      GoRoute(
+        path: '/student/final-report',
+        builder: (context, state) => const FinalReportSubmissionPage(),
+      ),
+      GoRoute(
+        path: '/student/assessment',
+        builder: (context, state) => const StudentAssessmentPage(),
       ),
 
       // ════════════════════════════════════════════════════════════════════

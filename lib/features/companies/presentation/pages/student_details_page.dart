@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../evaluations/data/models/evaluation_model.dart';
 import '../../../placements/data/models/placement_model.dart';
 import '../../../logbook/data/models/logbook_entry_model.dart';
 import '../pages/logbook_review_page.dart';
@@ -20,7 +22,7 @@ final studentDetailsProvider = FutureProvider.family<Map<String, dynamic>, Strin
   final placementSnapshot = await FirebaseFirestore.instance
       .collection('placements')
       .where('studentId', isEqualTo: studentId)
-      .where('status', isEqualTo: PlacementStatus.active.name)
+      .orderBy('createdAt', descending: true)
       .limit(1)
       .get();
 
@@ -61,6 +63,33 @@ final studentLogbooksProvider = StreamProvider.family<List<LogbookEntryModel>, S
       });
 });
 
+final placementCompanyEvaluationProvider =
+    StreamProvider.family<EvaluationModel?, String>((ref, placementId) {
+  return FirebaseFirestore.instance
+      .collection('evaluations')
+      .where('placementId', isEqualTo: placementId)
+      .where(
+        'evaluatorType',
+        isEqualTo: EvaluationType.companySupervisor.name,
+      )
+      .snapshots()
+      .map((snapshot) {
+        final evaluations = snapshot.docs
+            .map((doc) => EvaluationModel.fromFirestore(doc, null))
+            .toList()
+          ..sort((a, b) {
+            final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
+            final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
+            return bDate.compareTo(aDate);
+          });
+
+        if (evaluations.isEmpty) {
+          return null;
+        }
+        return evaluations.first;
+      });
+});
+
 class StudentDetailsPage extends ConsumerWidget {
   final String studentId;
 
@@ -84,6 +113,9 @@ class StudentDetailsPage extends ConsumerWidget {
           final student = details['student'] as Map<String, dynamic>?;
           final placement = details['placement'] as PlacementModel?;
           final universitySupervisor = details['universitySupervisor'] as Map<String, dynamic>?;
+          final companyEvaluationAsync = placement == null
+              ? null
+              : ref.watch(placementCompanyEvaluationProvider(placement.id));
 
           if (student == null) {
             return const Center(child: Text('Student not found'));
@@ -329,6 +361,32 @@ class StudentDetailsPage extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (placement != null) ...[
+                  const SizedBox(height: 16),
+                  if (companyEvaluationAsync == null)
+                    _buildAssessmentCard(context, placement, null, theme)
+                  else
+                    companyEvaluationAsync.when(
+                      data: (evaluation) => _buildAssessmentCard(
+                        context,
+                        placement,
+                        evaluation,
+                        theme,
+                      ),
+                      loading: () => const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      ),
+                      error: (error, _) => Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text('Error loading assessment: $error'),
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           );
@@ -343,6 +401,115 @@ class StudentDetailsPage extends ConsumerWidget {
               Text('Error: $error'),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssessmentCard(
+    BuildContext context,
+    PlacementModel placement,
+    EvaluationModel? evaluation,
+    ThemeData theme,
+  ) {
+    final isUnlocked = placement.isFinalAssessmentUnlocked;
+    final hasSubmitted = evaluation != null;
+    final statusColor = hasSubmitted
+        ? Colors.green
+        : isUnlocked
+            ? Colors.deepOrange
+            : Colors.blueGrey;
+    final statusLabel = hasSubmitted
+        ? 'Submitted'
+        : isUnlocked
+            ? 'Ready'
+            : 'Not Open Yet';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Final Assessment',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            Text(
+              hasSubmitted
+                  ? 'The final workplace assessment has already been submitted for this student.'
+                  : isUnlocked
+                      ? 'The internship has reached the assessment stage. You can now submit the final evaluation.'
+                      : 'This assessment becomes available after the final internship week or end date.',
+              style: TextStyle(
+                color: Colors.grey[700],
+                height: 1.5,
+              ),
+            ),
+            if (evaluation != null) ...[
+              const SizedBox(height: 16),
+              _InfoRow(
+                'Score',
+                '${evaluation.finalMarks.toStringAsFixed(1)}/100',
+              ),
+              if (evaluation.submittedAt != null)
+                _InfoRow(
+                  'Submitted',
+                  DateFormat('MMM dd, yyyy').format(evaluation.submittedAt!),
+                ),
+              if (evaluation.evaluatorName != null &&
+                  evaluation.evaluatorName!.trim().isNotEmpty)
+                _InfoRow('Evaluator', evaluation.evaluatorName!),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: !isUnlocked || hasSubmitted
+                    ? null
+                    : () => context.go(
+                          '/company-supervisor/evaluate/${placement.id}/$studentId',
+                        ),
+                icon: Icon(
+                  hasSubmitted
+                      ? Icons.check_circle_outline
+                      : Icons.assignment_outlined,
+                ),
+                label: Text(
+                  hasSubmitted
+                      ? 'Assessment Submitted'
+                      : isUnlocked
+                          ? 'Open Assessment Form'
+                          : 'Available After Internship',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

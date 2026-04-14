@@ -30,7 +30,7 @@ Future<void> main() async {
     print('Creating allocationRules/current...');
     await createDocument(client, baseUrl, 'allocationRules', 'current', {
       'academicYear': {'stringValue': '2025/2026'},
-      'maxStudentsPerSupervisor': {'integerValue': '12'},
+      'maxStudentsPerSupervisor': {'integerValue': '15'},
       'preferredPrograms': {
         'arrayValue': {
           'values': [
@@ -70,7 +70,7 @@ Future<void> main() async {
         'name': 'supervisorProfiles',
         'data': {
           'department': {'stringValue': 'Computer Science'},
-          'maxStudents': {'integerValue': '12'},
+          'maxStudents': {'integerValue': '15'},
           'currentLoad': {'integerValue': '0'},
         }
       },
