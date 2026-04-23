@@ -31,8 +31,7 @@ final _studentPlacementProvider =
 
 /// All weekly logbook entries submitted by this student
 final _studentWeeklySummariesProvider =
-    StreamProvider.family<List<LogbookEntryModel>, String>(
-        (ref, studentId) {
+    StreamProvider.family<List<LogbookEntryModel>, String>((ref, studentId) {
   return FirebaseFirestore.instance
       .collection('logbookEntries')
       .where('studentId', isEqualTo: studentId)
@@ -50,17 +49,17 @@ final _studentFinalReportProvider =
       .where('studentId', isEqualTo: studentId)
       .snapshots()
       .map((snap) {
-        final reports = snap.docs
-            .map((doc) => InternshipReportModel.fromFirestore(doc, null))
-            .toList()
-          ..sort((a, b) {
-            final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
-            final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
-            return bDate.compareTo(aDate);
-          });
-        if (reports.isEmpty) return null;
-        return reports.first;
+    final reports = snap.docs
+        .map((doc) => InternshipReportModel.fromFirestore(doc, null))
+        .toList()
+      ..sort((a, b) {
+        final aDate = a.submittedAt ?? a.createdAt ?? DateTime(1970);
+        final bDate = b.submittedAt ?? b.createdAt ?? DateTime(1970);
+        return bDate.compareTo(aDate);
       });
+    if (reports.isEmpty) return null;
+    return reports.first;
+  });
 });
 
 // ============================================================================
@@ -108,7 +107,8 @@ class StudentDetailsScreen extends ConsumerWidget {
               data: (placement) => placement != null
                   ? _buildPlacementCard(context, placement, theme)
                   : _buildNoPlacementCard(theme),
-              loading: () => const _LoadingCard(message: 'Loading placement...'),
+              loading: () =>
+                  const _LoadingCard(message: 'Loading placement...'),
               error: (e, _) => _ErrorCard(message: e.toString()),
             ),
             const SizedBox(height: 16),
@@ -124,8 +124,7 @@ class StudentDetailsScreen extends ConsumerWidget {
               data: (summaries) => summaries.isEmpty
                   ? _buildNoLogbooksCard(theme)
                   : _buildLogbookList(context, summaries, theme),
-              loading: () =>
-                  const _LoadingCard(message: 'Loading logbooks...'),
+              loading: () => const _LoadingCard(message: 'Loading logbooks...'),
               error: (e, _) => _ErrorCard(message: e.toString()),
             ),
             const SizedBox(height: 16),
@@ -254,8 +253,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                 color: statusInfo.color.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(statusInfo.icon,
-                  color: statusInfo.color, size: 20),
+              child: Icon(statusInfo.icon, color: statusInfo.color, size: 20),
             ),
             const SizedBox(width: 12),
             Column(
@@ -263,8 +261,7 @@ class StudentDetailsScreen extends ConsumerWidget {
               children: [
                 Text(
                   'Internship Status',
-                  style: TextStyle(
-                      fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -316,8 +313,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                 value:
                     '${placement.startDate!.day}/${placement.startDate!.month}/${placement.startDate!.year}',
               ),
-            _InfoRow(
-                label: 'Duration', value: '${placement.totalWeeks} weeks'),
+            _InfoRow(label: 'Duration', value: '${placement.totalWeeks} weeks'),
           ],
         ),
       ),
@@ -395,18 +391,16 @@ class StudentDetailsScreen extends ConsumerWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: isReviewed
-                    ? Colors.green.shade200
-                    : Colors.orange.shade200,
+                color:
+                    isReviewed ? Colors.green.shade200 : Colors.orange.shade200,
               ),
             ),
             child: ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: CircleAvatar(
-                backgroundColor: isReviewed
-                    ? Colors.green.shade100
-                    : Colors.orange.shade100,
+                backgroundColor:
+                    isReviewed ? Colors.green.shade100 : Colors.orange.shade100,
                 child: Text(
                   'W${summary.weekNumber}',
                   style: TextStyle(
@@ -420,8 +414,8 @@ class StudentDetailsScreen extends ConsumerWidget {
               ),
               title: Text(
                 'Week ${summary.weekNumber} Logbook',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               subtitle: Text(
                 '${summary.hoursWorked.toStringAsFixed(summary.hoursWorked.truncateToDouble() == summary.hoursWorked ? 0 : 1)}h worked • '
@@ -436,9 +430,8 @@ class StudentDetailsScreen extends ConsumerWidget {
               ),
               trailing: Icon(
                 Icons.chevron_right,
-                color: isReviewed
-                    ? Colors.green.shade400
-                    : Colors.orange.shade400,
+                color:
+                    isReviewed ? Colors.green.shade400 : Colors.orange.shade400,
               ),
               onTap: () => Navigator.push(
                 context,
@@ -467,8 +460,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Column(
           children: [
-            Icon(Icons.book_outlined,
-                size: 40, color: Colors.indigo.shade200),
+            Icon(Icons.book_outlined, size: 40, color: Colors.indigo.shade200),
             const SizedBox(height: 12),
             Text(
               'No logbook entries yet',
@@ -480,8 +472,7 @@ class StudentDetailsScreen extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               'This student has not submitted any weekly logbooks.',
-              style:
-                  TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
           ],
@@ -504,8 +495,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         child: Row(
           children: [
-            Icon(Icons.assignment_late_outlined,
-                color: Colors.teal.shade400),
+            Icon(Icons.assignment_late_outlined, color: Colors.teal.shade400),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
@@ -542,8 +532,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         side: BorderSide(color: statusColor.withOpacity(0.2)),
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: statusColor.withOpacity(0.12),
           child: const Icon(Icons.picture_as_pdf, color: Colors.red),
@@ -597,8 +586,7 @@ class StudentDetailsScreen extends ConsumerWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                StudentEvaluationScreen(student: student),
+            builder: (_) => StudentEvaluationScreen(student: student),
           ),
         ),
         icon: const Icon(Icons.grade_outlined),
@@ -608,8 +596,8 @@ class StudentDetailsScreen extends ConsumerWidget {
         ),
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );
@@ -656,9 +644,7 @@ class StudentDetailsScreen extends ConsumerWidget {
             color: Colors.purple);
       case StudentInternshipStatus.terminated:
         return _StatusInfo(
-            label: 'Terminated',
-            icon: Icons.block_rounded,
-            color: Colors.red);
+            label: 'Terminated', icon: Icons.block_rounded, color: Colors.red);
     }
   }
 }
@@ -705,8 +691,7 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           title,
-          style: const TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -738,8 +723,7 @@ class _CardHeader extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Text(title,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 14)),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
       ],
     );
   }
@@ -762,15 +746,13 @@ class _InfoRow extends StatelessWidget {
             width: 130,
             child: Text(
               '$label:',
-              style: TextStyle(
-                  fontSize: 13, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -798,8 +780,7 @@ class _MiniStat extends StatelessWidget {
       child: Card(
         elevation: 0,
         color: color.withOpacity(0.08),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           child: Column(
@@ -817,9 +798,7 @@ class _MiniStat extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                    fontSize: 11,
-                    color: color,
-                    fontWeight: FontWeight.w500),
+                    fontSize: 11, color: color, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -847,8 +826,7 @@ class _LoadingCard extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: 12),
-            Text(message,
-                style: TextStyle(color: Colors.grey.shade600)),
+            Text(message, style: TextStyle(color: Colors.grey.shade600)),
           ],
         ),
       ),
@@ -869,13 +847,11 @@ class _ErrorCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.error_outline,
-                color: Colors.red.shade400, size: 20),
+            Icon(Icons.error_outline, color: Colors.red.shade400, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text('Error: $message',
-                  style: TextStyle(
-                      color: Colors.red.shade700, fontSize: 13)),
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
             ),
           ],
         ),

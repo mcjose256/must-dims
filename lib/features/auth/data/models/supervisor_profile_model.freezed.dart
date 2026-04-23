@@ -227,7 +227,7 @@ class _$SupervisorProfileModelImpl implements _SupervisorProfileModel {
       this.email = 'No email',
       this.department = 'No department',
       final List<String> programSpecialties = const [],
-      this.maxStudents = 12,
+      this.maxStudents = 15,
       this.currentLoad = 0,
       this.isAvailable = true,
       this.phoneNumber,

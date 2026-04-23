@@ -3,11 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../logbook/data/models/logbook_entry_model.dart';
 import '../../controllers/student_controllers.dart';
 import '../../data/models/student_profile_model.dart';
 import '../../presentation/student_dashboard.dart';
 import '../../../placements/data/models/placement_model.dart';
-import '../../../logbook/data/models/logbook_entry_model.dart';
+import '../../../training_schedule/controllers/training_schedule_controller.dart';
+import '../../../training_schedule/data/training_schedule_item.dart';
+
+const _approvedTimelineStatuses = {
+  PlacementStatus.approved,
+  PlacementStatus.active,
+  PlacementStatus.completed,
+  PlacementStatus.extended,
+};
 
 class StudentOverviewPage extends ConsumerWidget {
   const StudentOverviewPage({super.key});
@@ -24,6 +33,7 @@ class StudentOverviewPage extends ConsumerWidget {
           ref.invalidate(studentProfileProvider);
           ref.invalidate(currentPlacementProvider);
           ref.invalidate(logbookEntriesProvider);
+          ref.invalidate(trainingScheduleCollectionProvider);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -36,17 +46,24 @@ class StudentOverviewPage extends ConsumerWidget {
               const SizedBox(height: 20),
 
               // ── Progress / Status Card ──────────────────────────────────
-              _buildStatusCard(context, ref, profileAsync, placementAsync, theme),
+              _buildStatusCard(
+                  context, ref, profileAsync, placementAsync, theme),
               const SizedBox(height: 20),
 
               // ── Quick Actions (dynamic per stage) ──────────────────────
+              _buildIndustrialTrainingSchedule(
+                ref,
+                placementAsync,
+                theme,
+              ),
               Text(
                 'Quick Actions',
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              _buildDynamicQuickActions(context, ref, profileAsync, placementAsync),
+              _buildDynamicQuickActions(
+                  context, ref, profileAsync, placementAsync),
 
               const SizedBox(height: 24),
 
@@ -114,8 +131,8 @@ class StudentOverviewPage extends ConsumerWidget {
           ),
         ),
         profileAsync.when(
-          data: (profile) => _InternshipStatusBadge(
-              status: profile?.internshipStatus),
+          data: (profile) =>
+              _InternshipStatusBadge(status: profile?.internshipStatus),
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
         ),
@@ -166,8 +183,9 @@ class StudentOverviewPage extends ConsumerWidget {
                 final status = profile?.internshipStatus ??
                     StudentInternshipStatus.notStarted;
                 final placement = placementAsync.value;
-                final placementProgress =
-                    placement != null ? placement.progressPercentage * 100 : null;
+                final placementProgress = placement != null
+                    ? placement.progressPercentage * 100
+                    : null;
                 final progress =
                     placementProgress ?? profile?.progressPercentage ?? 0.0;
 
@@ -260,6 +278,126 @@ class StudentOverviewPage extends ConsumerWidget {
   // ── Dynamic quick actions ───────────────────────────────────────────────
 
   /// Returns context-aware quick actions based on the student's current stage.
+  Widget _buildIndustrialTrainingSchedule(
+    WidgetRef ref,
+    AsyncValue<PlacementModel?> placementAsync,
+    ThemeData theme,
+  ) {
+    return placementAsync.when(
+      data: (placement) {
+        if (placement == null ||
+            !_approvedTimelineStatuses.contains(placement.status)) {
+          return const SizedBox.shrink();
+        }
+
+        final scheduleItems =
+            ref.watch(effectiveVisibleTrainingScheduleProvider);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.timeline_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Industrial Training Schedule',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Shared timeline for all interns',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ScheduleTag(
+                          label: 'Shared timeline',
+                          color: theme.colorScheme.primary,
+                        ),
+                        _ScheduleTag(
+                          label: 'Published items',
+                          color: Colors.green,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (scheduleItems.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          'No timeline available.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    else
+                      ...List.generate(scheduleItems.length, (index) {
+                        final entry = scheduleItems[index];
+                        final isLast = index == scheduleItems.length - 1;
+                        return _ScheduleTimelineTile(
+                          index: index + 1,
+                          entry: entry,
+                          showConnector: !isLast,
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildDynamicQuickActions(
     BuildContext context,
     WidgetRef ref,
@@ -442,8 +580,7 @@ class StudentOverviewPage extends ConsumerWidget {
               child: Column(
                 children: [
                   Icon(Icons.inbox_outlined,
-                      size: 48,
-                      color: theme.colorScheme.onSurfaceVariant),
+                      size: 48, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(height: 12),
                   Text(
                     'No logbook entries yet',
@@ -484,6 +621,210 @@ class StudentOverviewPage extends ConsumerWidget {
 // ============================================================================
 // HELPER WIDGETS
 // ============================================================================
+
+class _ScheduleAppearance {
+  final IconData icon;
+  final Color color;
+
+  const _ScheduleAppearance({
+    required this.icon,
+    required this.color,
+  });
+}
+
+class _ScheduleTag extends StatelessWidget {
+  const _ScheduleTag({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+const _scheduleAppearances = [
+  _ScheduleAppearance(icon: Icons.campaign_rounded, color: Colors.indigo),
+  _ScheduleAppearance(icon: Icons.search_rounded, color: Colors.blue),
+  _ScheduleAppearance(
+    icon: Icons.assignment_returned_rounded,
+    color: Colors.deepPurple,
+  ),
+  _ScheduleAppearance(icon: Icons.groups_rounded, color: Colors.teal),
+  _ScheduleAppearance(icon: Icons.work_history_rounded, color: Colors.green),
+  _ScheduleAppearance(icon: Icons.looks_one_rounded, color: Colors.orange),
+  _ScheduleAppearance(icon: Icons.drafts_rounded, color: Colors.amber),
+  _ScheduleAppearance(icon: Icons.looks_two_rounded, color: Colors.deepOrange),
+  _ScheduleAppearance(icon: Icons.picture_as_pdf_rounded, color: Colors.red),
+  _ScheduleAppearance(icon: Icons.fact_check_rounded, color: Colors.brown),
+  _ScheduleAppearance(icon: Icons.summarize_rounded, color: Colors.blueGrey),
+];
+
+_ScheduleAppearance _scheduleAppearanceForIndex(int index) {
+  return _scheduleAppearances[index % _scheduleAppearances.length];
+}
+
+class _ScheduleTimelineTile extends StatelessWidget {
+  const _ScheduleTimelineTile({
+    required this.index,
+    required this.entry,
+    required this.showConnector,
+  });
+
+  final int index;
+  final TrainingScheduleItem entry;
+  final bool showConnector;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appearance = _scheduleAppearanceForIndex(index - 1);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 50,
+            child: Column(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: appearance.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$index',
+                    style: TextStyle(
+                      color: appearance.color,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (showConnector)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: appearance.color.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: appearance.color.withValues(alpha: 0.14),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: appearance.color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          appearance.icon,
+                          color: appearance.color,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: appearance.color.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                entry.dateRange,
+                                style: TextStyle(
+                                  color: appearance.color,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'In charge: ${entry.personInCharge}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                  if ((entry.description ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      entry.description!.trim(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _InternshipStatusBadge extends StatelessWidget {
   final StudentInternshipStatus? status;
@@ -574,9 +915,7 @@ class _QuickActionsGrid extends StatelessWidget {
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       childAspectRatio: 1.1,
-      children: actions
-          .map((a) => _QuickActionCard(action: a))
-          .toList(),
+      children: actions.map((a) => _QuickActionCard(action: a)).toList(),
     );
   }
 }
@@ -669,8 +1008,7 @@ class _ActivityTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -685,7 +1023,8 @@ class _ActivityTile extends StatelessWidget {
         ),
         subtitle: Text(
           '${entry.weekStartDate.day}/${entry.weekStartDate.month}/${entry.weekStartDate.year} • ${entry.status.toUpperCase()}',
-          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+          style: TextStyle(
+              fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
         ),
         trailing: Icon(Icons.arrow_forward_ios_rounded,
             size: 14, color: theme.colorScheme.onSurfaceVariant),

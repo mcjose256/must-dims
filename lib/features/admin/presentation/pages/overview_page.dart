@@ -7,6 +7,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+enum _ReportSupervisorFilter { all, assigned, unassigned }
+
+enum _ReportVisitFilter {
+  all,
+  hasVisited,
+  zeroCompleted,
+  oneCompleted,
+  twoCompleted,
+  markedNotVisited,
+}
+
+String _reportSupervisorFilterLabel(_ReportSupervisorFilter filter) {
+  switch (filter) {
+    case _ReportSupervisorFilter.all:
+      return 'All supervisors';
+    case _ReportSupervisorFilter.assigned:
+      return 'Has supervisor';
+    case _ReportSupervisorFilter.unassigned:
+      return 'No supervisor';
+  }
+}
+
+String _reportVisitFilterLabel(_ReportVisitFilter filter) {
+  switch (filter) {
+    case _ReportVisitFilter.all:
+      return 'All visit outcomes';
+    case _ReportVisitFilter.hasVisited:
+      return 'Has visited';
+    case _ReportVisitFilter.zeroCompleted:
+      return '0 of 2 completed';
+    case _ReportVisitFilter.oneCompleted:
+      return '1 of 2 completed';
+    case _ReportVisitFilter.twoCompleted:
+      return '2 of 2 completed';
+    case _ReportVisitFilter.markedNotVisited:
+      return 'Marked not visited';
+  }
+}
+
 class OverviewPage extends ConsumerStatefulWidget {
   const OverviewPage({super.key});
 
@@ -17,6 +56,8 @@ class OverviewPage extends ConsumerStatefulWidget {
 class _OverviewPageState extends ConsumerState<OverviewPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  _ReportSupervisorFilter _supervisorFilter = _ReportSupervisorFilter.all;
+  _ReportVisitFilter _visitFilter = _ReportVisitFilter.all;
 
   @override
   void dispose() {
@@ -60,15 +101,37 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
             const SizedBox(height: 20),
             reportRowsAsync.when(
               data: (rows) {
-                final filteredRows = _filterRows(rows, _searchQuery);
-                return _ReportSection(
-                  rows: filteredRows,
-                  totalRows: rows.length,
-                  searchController: _searchController,
-                  searchQuery: _searchQuery,
-                  onSearchChanged: (value) =>
-                      setState(() => _searchQuery = value.trim()),
-                  onOpenReport: () => _showReportDialog(context, rows),
+                final filteredRows = _filterRows(
+                  rows,
+                  query: _searchQuery,
+                  supervisorFilter: _supervisorFilter,
+                  visitFilter: _visitFilter,
+                );
+                return Column(
+                  children: [
+                    _VisitCoverageSection(rows: rows),
+                    const SizedBox(height: 20),
+                    _ReportSection(
+                      rows: filteredRows,
+                      totalRows: rows.length,
+                      searchController: _searchController,
+                      searchQuery: _searchQuery,
+                      supervisorFilter: _supervisorFilter,
+                      visitFilter: _visitFilter,
+                      onSearchChanged: (value) =>
+                          setState(() => _searchQuery = value.trim()),
+                      onSupervisorFilterChanged: (value) =>
+                          setState(() => _supervisorFilter = value),
+                      onVisitFilterChanged: (value) =>
+                          setState(() => _visitFilter = value),
+                      onClearFilters: _clearReportFilters,
+                      onOpenReport: () => _showReportDialog(
+                        context,
+                        rows: filteredRows,
+                        totalRows: rows.length,
+                      ),
+                    ),
+                  ],
                 );
               },
               loading: () => const _LoadingCard(),
@@ -84,33 +147,81 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
   }
 
   List<StudentPlacementReportRow> _filterRows(
-    List<StudentPlacementReportRow> rows,
-    String query,
-  ) {
-    if (query.isEmpty) return rows;
+    List<StudentPlacementReportRow> rows, {
+    required String query,
+    required _ReportSupervisorFilter supervisorFilter,
+    required _ReportVisitFilter visitFilter,
+  }) {
+    final normalized = query.trim().toLowerCase();
 
-    final normalized = query.toLowerCase();
     return rows.where((row) {
-      return row.studentName.toLowerCase().contains(normalized) ||
-          row.supervisorName.toLowerCase().contains(normalized) ||
-          row.companyName.toLowerCase().contains(normalized);
+      final matchesQuery = normalized.isEmpty ||
+          [
+            row.studentName,
+            row.registrationNumber,
+            row.program,
+            row.supervisorName,
+            row.companyName,
+            row.district,
+            _formatStatus(row.internshipStatus),
+            row.visitOneStatus,
+            row.visitTwoStatus,
+            row.visitCoverageLabel,
+          ].join(' ').toLowerCase().contains(normalized);
+
+      final matchesSupervisor = switch (supervisorFilter) {
+        _ReportSupervisorFilter.all => true,
+        _ReportSupervisorFilter.assigned => row.hasSupervisor,
+        _ReportSupervisorFilter.unassigned => !row.hasSupervisor,
+      };
+
+      final matchesVisit = switch (visitFilter) {
+        _ReportVisitFilter.all => true,
+        _ReportVisitFilter.hasVisited => row.hasVisited,
+        _ReportVisitFilter.zeroCompleted => row.isVisitTrackable &&
+            !row.hasNotVisited &&
+            row.visitsCompleted == 0,
+        _ReportVisitFilter.oneCompleted => row.isVisitTrackable &&
+            !row.hasNotVisited &&
+            row.visitsCompleted == 1,
+        _ReportVisitFilter.twoCompleted => row.isVisitTrackable &&
+            !row.hasNotVisited &&
+            row.visitsCompleted >= 2,
+        _ReportVisitFilter.markedNotVisited => row.hasNotVisited,
+      };
+
+      return matchesQuery && matchesSupervisor && matchesVisit;
     }).toList();
   }
 
+  void _clearReportFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _supervisorFilter = _ReportSupervisorFilter.all;
+      _visitFilter = _ReportVisitFilter.all;
+    });
+  }
+
   Future<void> _showReportDialog(
-    BuildContext context,
-    List<StudentPlacementReportRow> rows,
-  ) async {
+    BuildContext context, {
+    required List<StudentPlacementReportRow> rows,
+    required int totalRows,
+  }) async {
     final csvContent = _buildCsv(rows);
     final date = DateTime.now();
+    final filenamePrefix = rows.length == totalRows
+        ? 'must_student_report'
+        : 'must_student_report_filtered';
     final filename =
-        'must_student_report_${date.year}_${date.month.toString().padLeft(2, '0')}_${date.day.toString().padLeft(2, '0')}.csv';
+        '${filenamePrefix}_${date.year}_${date.month.toString().padLeft(2, '0')}_${date.day.toString().padLeft(2, '0')}.csv';
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
@@ -139,7 +250,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${rows.length} students',
+                              rows.length == totalRows
+                                  ? '$totalRows students'
+                                  : '${rows.length} of $totalRows students',
                               style: Theme.of(dialogContext)
                                   .textTheme
                                   .bodyMedium
@@ -182,6 +295,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                               DataColumn(label: Text('Supervisor')),
                               DataColumn(label: Text('Company')),
                               DataColumn(label: Text('District')),
+                              DataColumn(label: Text('Visit 1')),
+                              DataColumn(label: Text('Visit 2')),
+                              DataColumn(label: Text('Progress')),
                             ],
                             rows: rows
                                 .map(
@@ -191,11 +307,19 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                                       DataCell(Text(row.registrationNumber)),
                                       DataCell(Text(row.program)),
                                       DataCell(_StatusBadge(
-                                        label: _formatStatus(row.internshipStatus),
+                                        label:
+                                            _formatStatus(row.internshipStatus),
                                       )),
                                       DataCell(Text(row.supervisorName)),
                                       DataCell(Text(row.companyName)),
                                       DataCell(Text(row.district)),
+                                      DataCell(Text(row.visitOneStatus)),
+                                      DataCell(Text(row.visitTwoStatus)),
+                                      DataCell(
+                                        _VisitSummaryPill(
+                                          visitsCompleted: row.visitsCompleted,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 )
@@ -223,13 +347,15 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                                   );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Report saved')),
+                                      const SnackBar(
+                                          content: Text('Report saved')),
                                     );
                                   }
                                 } catch (_) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Save failed')),
+                                      const SnackBar(
+                                          content: Text('Save failed')),
                                     );
                                   }
                                 }
@@ -247,13 +373,15 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                                   );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Share ready')),
+                                      const SnackBar(
+                                          content: Text('Share ready')),
                                     );
                                   }
                                 } catch (_) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Share failed')),
+                                      const SnackBar(
+                                          content: Text('Share failed')),
                                     );
                                   }
                                 }
@@ -264,7 +392,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                             const SizedBox(height: 10),
                             OutlinedButton.icon(
                               onPressed: () async {
-                                await Clipboard.setData(ClipboardData(text: csvContent));
+                                await Clipboard.setData(
+                                    ClipboardData(text: csvContent));
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('CSV copied')),
@@ -282,7 +411,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                         children: [
                           OutlinedButton.icon(
                             onPressed: () async {
-                              await Clipboard.setData(ClipboardData(text: csvContent));
+                              await Clipboard.setData(
+                                  ClipboardData(text: csvContent));
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('CSV copied')),
@@ -302,13 +432,15 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                                 );
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Share ready')),
+                                    const SnackBar(
+                                        content: Text('Share ready')),
                                   );
                                 }
                               } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Share failed')),
+                                    const SnackBar(
+                                        content: Text('Share failed')),
                                   );
                                 }
                               }
@@ -326,13 +458,15 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
                                 );
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Report saved')),
+                                    const SnackBar(
+                                        content: Text('Report saved')),
                                   );
                                 }
                               } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Save failed')),
+                                    const SnackBar(
+                                        content: Text('Save failed')),
                                   );
                                 }
                               }
@@ -364,6 +498,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
           'University Supervisor',
           'Company',
           'District',
+          'Visit 1',
+          'Visit 2',
+          'Visits Completed',
         ].map(_escapeCsv).join(','),
       );
 
@@ -377,6 +514,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage> {
           row.supervisorName,
           row.companyName,
           row.district,
+          row.visitOneStatus,
+          row.visitTwoStatus,
+          '${row.visitsCompleted}/2',
         ].map(_escapeCsv).join(','),
       );
     }
@@ -622,8 +762,9 @@ class _StatsSection extends StatelessWidget {
                       Text(
                         'Live system counts.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -717,7 +858,6 @@ class _StatsSection extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _DistrictBreakdownSection extends StatelessWidget {
@@ -787,7 +927,8 @@ class _DistrictBreakdownSection extends StatelessWidget {
                                   DataCell(
                                     Text(
                                       row.district,
-                                      style: theme.textTheme.titleSmall?.copyWith(
+                                      style:
+                                          theme.textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -816,10 +957,8 @@ class _DistrictBreakdownSection extends StatelessWidget {
                                 DataCell(
                                   Text(
                                     'No allocation data',
-                                    style:
-                                        theme.textTheme.titleSmall?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -830,8 +969,8 @@ class _DistrictBreakdownSection extends StatelessWidget {
                                     child: Text(
                                       '-',
                                       textAlign: TextAlign.end,
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
                                         color:
                                             theme.colorScheme.onSurfaceVariant,
                                         fontWeight: FontWeight.w700,
@@ -853,13 +992,170 @@ class _DistrictBreakdownSection extends StatelessWidget {
   }
 }
 
+class _VisitCoverageSection extends StatelessWidget {
+  const _VisitCoverageSection({required this.rows});
+
+  final List<StudentPlacementReportRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final trackableRows = rows
+        .where(
+          (row) => row.visitOneStatus != 'N/A' || row.visitTwoStatus != 'N/A',
+        )
+        .toList(growable: false);
+
+    final noVisitsLogged = trackableRows
+        .where((row) => !row.hasNotVisited && row.visitsCompleted == 0)
+        .length;
+    final oneVisitLogged = trackableRows
+        .where((row) => !row.hasNotVisited && row.visitsCompleted == 1)
+        .length;
+    final twoVisitsLogged = trackableRows
+        .where((row) => !row.hasNotVisited && row.visitsCompleted >= 2)
+        .length;
+    final markedNotVisited =
+        trackableRows.where((row) => row.hasNotVisited).length;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Supervisor Visit Coverage',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Two expected visits per internship.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (trackableRows.isEmpty)
+              const _EmptyState(
+                icon: Icons.timeline_rounded,
+                title: 'No visit records',
+                subtitle: 'Visit records will appear here.',
+              )
+            else
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _VisitCoverageTile(
+                    label: '0 of 2 visits recorded',
+                    value: noVisitsLogged,
+                    color: const Color(0xFFB26A00),
+                    icon: Icons.schedule_rounded,
+                  ),
+                  _VisitCoverageTile(
+                    label: '1 of 2 visits recorded',
+                    value: oneVisitLogged,
+                    color: MustBrandColors.greenLight,
+                    icon: Icons.looks_one_rounded,
+                  ),
+                  _VisitCoverageTile(
+                    label: '2 of 2 visits recorded',
+                    value: twoVisitsLogged,
+                    color: MustBrandColors.green,
+                    icon: Icons.done_all_rounded,
+                  ),
+                  _VisitCoverageTile(
+                    label: 'Marked not visited',
+                    value: markedNotVisited,
+                    color: const Color(0xFFB3261E),
+                    icon: Icons.report_problem_outlined,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisitCoverageTile extends StatelessWidget {
+  const _VisitCoverageTile({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 210,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$value',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReportSection extends StatelessWidget {
   const _ReportSection({
     required this.rows,
     required this.totalRows,
     required this.searchController,
     required this.searchQuery,
+    required this.supervisorFilter,
+    required this.visitFilter,
     required this.onSearchChanged,
+    required this.onSupervisorFilterChanged,
+    required this.onVisitFilterChanged,
+    required this.onClearFilters,
     required this.onOpenReport,
   });
 
@@ -867,13 +1163,21 @@ class _ReportSection extends StatelessWidget {
   final int totalRows;
   final TextEditingController searchController;
   final String searchQuery;
+  final _ReportSupervisorFilter supervisorFilter;
+  final _ReportVisitFilter visitFilter;
   final ValueChanged<String> onSearchChanged;
+  final ValueChanged<_ReportSupervisorFilter> onSupervisorFilterChanged;
+  final ValueChanged<_ReportVisitFilter> onVisitFilterChanged;
+  final VoidCallback onClearFilters;
   final VoidCallback onOpenReport;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final previewRows = rows.take(8).toList();
+    final hasActiveFilters = searchQuery.isNotEmpty ||
+        supervisorFilter != _ReportSupervisorFilter.all ||
+        visitFilter != _ReportVisitFilter.all;
 
     return Card(
       child: Padding(
@@ -897,7 +1201,7 @@ class _ReportSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '$totalRows records. Full report contains all fields and export options.',
+                        '$totalRows records',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -906,7 +1210,7 @@ class _ReportSection extends StatelessWidget {
                       FilledButton.icon(
                         onPressed: totalRows == 0 ? null : onOpenReport,
                         icon: const Icon(Icons.download_rounded),
-                        label: const Text('Open Full Report'),
+                        label: const Text('View Report'),
                       ),
                     ],
                   );
@@ -926,7 +1230,7 @@ class _ReportSection extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '$totalRows records. Full report contains all fields and export options.',
+                            '$totalRows records',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -935,9 +1239,9 @@ class _ReportSection extends StatelessWidget {
                       ),
                     ),
                     FilledButton.icon(
-                      onPressed: totalRows == 0 ? null : onOpenReport,
+                      onPressed: rows.isEmpty ? null : onOpenReport,
                       icon: const Icon(Icons.download_rounded),
-                      label: const Text('Open Full Report'),
+                      label: const Text('View Report'),
                     ),
                   ],
                 );
@@ -949,7 +1253,7 @@ class _ReportSection extends StatelessWidget {
               onChanged: onSearchChanged,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search_rounded),
-                hintText: 'Search by student, supervisor, or company...',
+                hintText: 'Search student, reg no., supervisor, company',
                 suffixIcon: searchQuery.isEmpty
                     ? null
                     : IconButton(
@@ -960,6 +1264,90 @@ class _ReportSection extends StatelessWidget {
                         icon: const Icon(Icons.close_rounded),
                       ),
               ),
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+
+                final supervisorDropdown =
+                    DropdownButtonFormField<_ReportSupervisorFilter>(
+                  initialValue: supervisorFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Supervisor filter',
+                  ),
+                  items: _ReportSupervisorFilter.values
+                      .map(
+                        (filter) => DropdownMenuItem(
+                          value: filter,
+                          child: Text(_reportSupervisorFilterLabel(filter)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) onSupervisorFilterChanged(value);
+                  },
+                );
+
+                final visitDropdown =
+                    DropdownButtonFormField<_ReportVisitFilter>(
+                  initialValue: visitFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Visit filter',
+                  ),
+                  items: _ReportVisitFilter.values
+                      .map(
+                        (filter) => DropdownMenuItem(
+                          value: filter,
+                          child: Text(_reportVisitFilterLabel(filter)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) onVisitFilterChanged(value);
+                  },
+                );
+
+                final clearButton = hasActiveFilters
+                    ? Align(
+                        alignment: compact
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: onClearFilters,
+                          icon: const Icon(Icons.filter_alt_off_rounded),
+                          label: const Text('Clear filters'),
+                        ),
+                      )
+                    : const SizedBox.shrink();
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      supervisorDropdown,
+                      const SizedBox(height: 12),
+                      visitDropdown,
+                      if (hasActiveFilters) ...[
+                        const SizedBox(height: 8),
+                        clearButton,
+                      ],
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: supervisorDropdown),
+                    const SizedBox(width: 12),
+                    Expanded(child: visitDropdown),
+                    if (hasActiveFilters) ...[
+                      const SizedBox(width: 8),
+                      clearButton,
+                    ],
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 18),
             ClipRRect(
@@ -983,12 +1371,14 @@ class _ReportSection extends StatelessWidget {
                       DataColumn(label: Text('Student')),
                       DataColumn(label: Text('Supervisor')),
                       DataColumn(label: Text('Company')),
+                      DataColumn(label: Text('Visits')),
                     ],
                     rows: totalRows == 0
                         ? [
                             const DataRow(
                               cells: [
-                                DataCell(Text('No student records')),
+                                DataCell(Text('No records')),
+                                DataCell(Text('-')),
                                 DataCell(Text('-')),
                                 DataCell(Text('-')),
                               ],
@@ -998,7 +1388,8 @@ class _ReportSection extends StatelessWidget {
                             ? [
                                 const DataRow(
                                   cells: [
-                                    DataCell(Text('No matches found')),
+                                    DataCell(Text('No results')),
+                                    DataCell(Text('-')),
                                     DataCell(Text('-')),
                                     DataCell(Text('-')),
                                   ],
@@ -1011,6 +1402,13 @@ class _ReportSection extends StatelessWidget {
                                       DataCell(Text(row.studentName)),
                                       DataCell(Text(row.supervisorName)),
                                       DataCell(Text(row.companyName)),
+                                      DataCell(
+                                        _VisitSummaryPill(
+                                          visitsCompleted: row.visitsCompleted,
+                                          visitOneStatus: row.visitOneStatus,
+                                          visitTwoStatus: row.visitTwoStatus,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 )
@@ -1024,7 +1422,7 @@ class _ReportSection extends StatelessWidget {
               Text(
                 rows.length == totalRows
                     ? 'Showing ${previewRows.length} of $totalRows records.'
-                    : 'Showing ${previewRows.length} of ${rows.length} matching records.',
+                    : 'Showing ${previewRows.length} of ${rows.length} filtered records.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1035,6 +1433,69 @@ class _ReportSection extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VisitSummaryPill extends StatelessWidget {
+  const _VisitSummaryPill({
+    required this.visitsCompleted,
+    this.visitOneStatus,
+    this.visitTwoStatus,
+  });
+
+  final int visitsCompleted;
+  final String? visitOneStatus;
+  final String? visitTwoStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final statuses = [visitOneStatus, visitTwoStatus]
+        .whereType<String>()
+        .where((status) => status != 'N/A')
+        .toList(growable: false);
+
+    final hasNotVisited = statuses.contains('Not visited');
+    final color = hasNotVisited
+        ? const Color(0xFFB3261E)
+        : visitsCompleted >= 2
+            ? MustBrandColors.green
+            : visitsCompleted == 1
+                ? const Color(0xFFB26A00)
+                : const Color(0xFF8A5A00);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _visitPillLabel(statuses, visitsCompleted),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+String _visitPillLabel(List<String> statuses, int visitsCompleted) {
+  if (statuses.isEmpty) return 'No visits';
+
+  final notVisitedCount =
+      statuses.where((status) => status == 'Not visited').length;
+  if (notVisitedCount > 0 && visitsCompleted > 0) {
+    return '$visitsCompleted visited, $notVisitedCount not visited';
+  }
+
+  if (notVisitedCount > 0) {
+    return notVisitedCount == 1
+        ? 'Not visited'
+        : '$notVisitedCount visits not visited';
+  }
+
+  return '$visitsCompleted of ${StudentPlacementReportRow.expectedSupervisorVisits} visits recorded';
 }
 
 class _DistrictBarChart extends StatelessWidget {

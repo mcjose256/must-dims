@@ -12,40 +12,40 @@ import '../../../placements/data/models/placement_model.dart';
 // PROVIDERS
 // ============================================================================
 
-final pendingPlacementsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final pendingPlacementsProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
       .collection('placements')
       .where('status', isEqualTo: 'pending')
       .orderBy('createdAt', descending: true)
       .snapshots()
       .asyncMap((snapshot) async {
-        final List<Map<String, dynamic>> placementsWithDetails = [];
+    final List<Map<String, dynamic>> placementsWithDetails = [];
 
-        for (var placementDoc in snapshot.docs) {
-          final placementData = placementDoc.data();
-          final placement = PlacementModel.fromFirestore(placementDoc, null);
+    for (var placementDoc in snapshot.docs) {
+      final placement = PlacementModel.fromFirestore(placementDoc, null);
 
-          // Get student details
-          final studentDoc = await FirebaseFirestore.instance
-              .collection('students')
-              .doc(placement.studentId)
-              .get();
+      // Get student details
+      final studentDoc = await FirebaseFirestore.instance
+          .collection('students')
+          .doc(placement.studentId)
+          .get();
 
-          // Get company details
-          final companyDoc = await FirebaseFirestore.instance
-              .collection('companies')
-              .doc(placement.companyId)
-              .get();
+      // Get company details
+      final companyDoc = await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(placement.companyId)
+          .get();
 
-          placementsWithDetails.add({
-            'placement': placement,
-            'student': studentDoc.data(),
-            'company': companyDoc.data(),
-          });
-        }
-
-        return placementsWithDetails;
+      placementsWithDetails.add({
+        'placement': placement,
+        'student': studentDoc.data(),
+        'company': companyDoc.data(),
       });
+    }
+
+    return placementsWithDetails;
+  });
 });
 
 // ============================================================================
@@ -67,7 +67,8 @@ class PendingPlacementsPage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
+                  Icon(Icons.check_circle_outline,
+                      size: 64, color: Colors.green[300]),
                   const SizedBox(height: 16),
                   Text(
                     'No pending placements',
@@ -120,32 +121,39 @@ class PendingPlacementsPage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Student Info
-                          _InfoRow('Student', student?['fullName'] ?? 'Unknown'),
-                          _InfoRow('Reg Number', student?['registrationNumber'] ?? 'N/A'),
+                          _InfoRow(
+                              'Student', student?['fullName'] ?? 'Unknown'),
+                          _InfoRow('Reg Number',
+                              student?['registrationNumber'] ?? 'N/A'),
                           _InfoRow('Program', student?['program'] ?? 'N/A'),
                           const Divider(height: 24),
-                          
+
                           // Company Info
                           _InfoRow('Company', company?['name'] ?? 'Unknown'),
                           _InfoRow('Industry', company?['industry'] ?? 'N/A'),
                           _InfoRow('Location', company?['location'] ?? 'N/A'),
                           const Divider(height: 24),
-                          
+
                           // Supervisor Info
-                          _InfoRow('Supervisor Name', placement.companySupervisorName ?? 'N/A'),
-                          _InfoRow('Supervisor Email', placement.companySupervisorEmail ?? 'N/A'),
-                          _InfoRow('Supervisor Phone', placement.companySupervisorPhone ?? 'N/A'),
+                          _InfoRow('Supervisor Name',
+                              placement.companySupervisorName ?? 'N/A'),
+                          _InfoRow('Supervisor Email',
+                              placement.companySupervisorEmail ?? 'N/A'),
+                          _InfoRow('Supervisor Phone',
+                              placement.companySupervisorPhone ?? 'N/A'),
                           const Divider(height: 24),
-                          
+
                           // Acceptance Letter Viewer
                           AcceptanceLetterViewer(
                             fileUrl: placement.acceptanceLetterUrl,
-                            fileName: placement.acceptanceLetterFileName ?? 'acceptance_letter',
+                            fileName: placement.acceptanceLetterFileName ??
+                                'acceptance_letter',
                           ),
                           const SizedBox(height: 16),
-                          
+
                           // Student Notes
-                          if (placement.studentNotes != null && placement.studentNotes!.isNotEmpty) ...[
+                          if (placement.studentNotes != null &&
+                              placement.studentNotes!.isNotEmpty) ...[
                             const Text(
                               'Student Notes',
                               style: TextStyle(fontWeight: FontWeight.bold),
@@ -162,13 +170,14 @@ class PendingPlacementsPage extends ConsumerWidget {
                             ),
                             const SizedBox(height: 16),
                           ],
-                          
+
                           // Action Buttons
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: () => _rejectPlacement(context, ref, placement),
+                                onPressed: () =>
+                                    _rejectPlacement(context, ref, placement),
                                 icon: const Icon(Icons.close),
                                 label: const Text('Reject'),
                                 style: OutlinedButton.styleFrom(
@@ -177,7 +186,8 @@ class PendingPlacementsPage extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               FilledButton.icon(
-                                onPressed: () => _approvePlacement(context, ref, placement),
+                                onPressed: () =>
+                                    _approvePlacement(context, ref, placement),
                                 icon: const Icon(Icons.check),
                                 label: const Text('Approve'),
                               ),
@@ -255,7 +265,7 @@ class PendingPlacementsPage extends ConsumerWidget {
 
       // Update student profile status
       await FirebaseFirestore.instance
-          .collection('studentProfiles')
+          .collection('students')
           .doc(placement.studentId)
           .update({
         'internshipStatus': 'approved',
@@ -319,7 +329,8 @@ class PendingPlacementsPage extends ConsumerWidget {
                   decoration: const InputDecoration(
                     labelText: 'Rejection Reason',
                     border: OutlineInputBorder(),
-                    hintText: 'e.g., Invalid acceptance letter, missing information...',
+                    hintText:
+                        'e.g., Invalid acceptance letter, missing information...',
                   ),
                   maxLines: 4,
                   textInputAction: TextInputAction.done,
@@ -345,7 +356,8 @@ class PendingPlacementsPage extends ConsumerWidget {
                               }
                               Navigator.pop(context, true);
                             },
-                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red),
                             child: const Text('Reject'),
                           ),
                           const SizedBox(height: 10),
@@ -377,7 +389,8 @@ class PendingPlacementsPage extends ConsumerWidget {
                             }
                             Navigator.pop(context, true);
                           },
-                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                          style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red),
                           child: const Text('Reject'),
                         ),
                       ],
@@ -606,7 +619,8 @@ class AcceptanceLetterViewer extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                            Icon(Icons.broken_image,
+                                size: 48, color: Colors.grey),
                             SizedBox(height: 8),
                             Text('Failed to load image'),
                           ],
@@ -655,7 +669,8 @@ class AcceptanceLetterViewer extends StatelessWidget {
                               top: 10,
                               right: 10,
                               child: IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
                                 onPressed: () => Navigator.pop(context),
                               ),
                             ),

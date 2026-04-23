@@ -27,6 +27,9 @@ class SupervisorProfileModel with _$SupervisorProfileModel {
     SnapshotOptions? options,
   ) {
     final data = snapshot.data() ?? {};
+    final storedCapacity = (data['maxStudents'] as num?)?.toInt() ?? 15;
+    final effectiveCapacity = storedCapacity < 15 ? 15 : storedCapacity;
+
     return SupervisorProfileModel.fromJson({
       ...data,
       'uid': snapshot.id,
@@ -34,6 +37,7 @@ class SupervisorProfileModel with _$SupervisorProfileModel {
       'fullName': data['FullName'] ?? data['fullName'] ?? 'Unknown Supervisor',
       'email': data['email'] ?? 'No email',
       'department': data['department'] ?? 'No department',
+      'maxStudents': effectiveCapacity,
     });
   }
 }

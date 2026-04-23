@@ -13,8 +13,7 @@ const _slideLabels = ['Welcome', 'Stories', 'Requirements'];
 // FIRESTORE PROVIDERS
 // ============================================================================
 
-final landingStatsProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
+final landingStatsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   return FirebaseFirestore.instance
       .collection('landing_stats')
       .orderBy('order')
@@ -116,8 +115,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
           // ── Top bar ────────────────────────────────────────────
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 children: [
                   Expanded(
@@ -143,9 +141,8 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                         child: Text(
                           _slideLabels[_currentPage],
                           style: TextStyle(
-                            color: _currentPage == 0
-                                ? Colors.white
-                                : _mustGreen,
+                            color:
+                                _currentPage == 0 ? Colors.white : _mustGreen,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             letterSpacing: 0.3,
@@ -183,8 +180,8 @@ class _LandingPageState extends ConsumerState<LandingPage> {
             left: 0,
             right: 0,
             child: Container(
-              padding: EdgeInsets.fromLTRB(24, 16, 24,
-                  MediaQuery.of(context).padding.bottom + 16),
+              padding: EdgeInsets.fromLTRB(
+                  24, 16, 24, MediaQuery.of(context).padding.bottom + 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
@@ -205,8 +202,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                       _totalSlides,
                       (i) => AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin:
-                            const EdgeInsets.symmetric(horizontal: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: i == _currentPage ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
@@ -231,8 +227,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                             if (_currentPage > 0)
                               IconButton(
                                 onPressed: _prevPage,
-                                icon: const Icon(
-                                    Icons.arrow_back_ios_rounded),
+                                icon: const Icon(Icons.arrow_back_ios_rounded),
                                 color: _mustGreen,
                               )
                             else
@@ -245,8 +240,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 32, vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -278,8 +272,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 24, vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Text('Log In',
                                   style: TextStyle(
@@ -295,8 +288,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 24, vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Text('Register',
                                   style: TextStyle(
@@ -319,8 +311,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 24, vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Text('Log In',
                                   style: TextStyle(
@@ -338,8 +329,7 @@ class _LandingPageState extends ConsumerState<LandingPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 24, vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Text('Register',
                                   style: TextStyle(
@@ -428,8 +418,8 @@ class _StatsSlide extends ConsumerWidget {
           .toString();
       final value =
           (stat['value'] ?? stat['count'] ?? stat['total'] ?? '--').toString();
-      final note = (stat['description'] ?? stat['subtitle'] ?? stat['note'])
-          ?.toString();
+      final note =
+          (stat['description'] ?? stat['subtitle'] ?? stat['note'])?.toString();
       final appearance = _statAppearanceForLabel(label, index: index);
 
       return _StatItem(
@@ -513,8 +503,7 @@ class _StatsSlide extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border:
-                            Border.all(color: _mustGold, width: 2),
+                        border: Border.all(color: _mustGold, width: 2),
                       ),
                       padding: const EdgeInsets.all(4),
                       child: ClipOval(
@@ -589,8 +578,7 @@ class _StatsSlide extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Structured figures from the DIMS platform.',
-                  style: TextStyle(
-                      color: Colors.grey.shade600, fontSize: 13),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                 ),
                 const SizedBox(height: 20),
 
@@ -766,7 +754,7 @@ class _StatsTableRow extends StatelessWidget {
 }
 
 // ============================================================================
-// SLIDE 2 — SUCCESS STORIES
+// SLIDE 2 - SUCCESS STORIES
 // ============================================================================
 
 class _StoriesSlide extends ConsumerWidget {
@@ -811,9 +799,8 @@ class _StoriesSlide extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(24, 100, 24, 28),
           decoration: BoxDecoration(
             color: _mustGreen.withOpacity(0.05),
-            border: Border(
-                bottom:
-                    BorderSide(color: _mustGreen.withOpacity(0.1))),
+            border:
+                Border(bottom: BorderSide(color: _mustGreen.withOpacity(0.1))),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -836,8 +823,7 @@ class _StoriesSlide extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(
                 'Real experiences from MUST interns',
-                style: TextStyle(
-                    color: Colors.grey.shade600, fontSize: 13),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
               ),
             ],
           ),
@@ -846,14 +832,11 @@ class _StoriesSlide extends ConsumerWidget {
         Expanded(
           child: storiesAsync.when(
             data: (stories) {
-              final items =
-                  stories.isNotEmpty ? stories : _fallback;
+              final items = stories.isNotEmpty ? stories : _fallback;
               return ListView.separated(
-                padding:
-                    const EdgeInsets.fromLTRB(20, 20, 20, 110),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
                 itemCount: items.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: 16),
+                separatorBuilder: (_, __) => const SizedBox(height: 16),
                 itemBuilder: (_, i) {
                   final s = items[i];
                   return _StoryCard(
@@ -1004,8 +987,7 @@ class _RequirementsSlide extends ConsumerWidget {
               Text(
                 'What you need to get started at MUST',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 13),
+                    color: Colors.white.withOpacity(0.8), fontSize: 13),
               ),
             ],
           ),
@@ -1021,20 +1003,17 @@ class _RequirementsSlide extends ConsumerWidget {
                           ? _fallback.length
                           : reqs.length,
                       (i) => _Requirement(
-                        icon: _fallback[i < _fallback.length
-                                ? i
-                                : _fallback.length - 1]
+                        icon: _fallback[
+                                i < _fallback.length ? i : _fallback.length - 1]
                             .icon,
-                        iconColor: _fallback[i < _fallback.length
-                                ? i
-                                : _fallback.length - 1]
+                        iconColor: _fallback[
+                                i < _fallback.length ? i : _fallback.length - 1]
                             .iconColor,
                         step: '${i + 1}',
-                        title: reqs[i]['title'] as String? ??
-                            _fallback[i].title,
-                        description:
-                            reqs[i]['description'] as String? ??
-                                _fallback[i].description,
+                        title:
+                            reqs[i]['title'] as String? ?? _fallback[i].title,
+                        description: reqs[i]['description'] as String? ??
+                            _fallback[i].description,
                       ),
                     )
                   : _fallback;
@@ -1139,7 +1118,8 @@ class _StoryCard extends StatelessWidget {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: _mustGreen,
-                      backgroundImage: hasImage ? NetworkImage(imageUrl!) : null,
+                      backgroundImage:
+                          hasImage ? NetworkImage(imageUrl!) : null,
                       child: hasImage
                           ? null
                           : Text(
@@ -1216,8 +1196,8 @@ class _RequirementCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: _mustGold.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),

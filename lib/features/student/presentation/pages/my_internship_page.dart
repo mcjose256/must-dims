@@ -283,8 +283,7 @@ class MyInternshipPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardHeader(
-                    icon: Icons.business, title: 'Company Information'),
+                _CardHeader(icon: Icons.business, title: 'Company Information'),
                 const SizedBox(height: 16),
                 const Divider(height: 1),
                 const SizedBox(height: 16),
@@ -309,8 +308,7 @@ class MyInternshipPage extends ConsumerWidget {
                   ),
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (_, __) =>
-                      const Text('Error loading company details'),
+                  error: (_, __) => const Text('Error loading company details'),
                 ),
               ],
             ),
@@ -387,9 +385,7 @@ class MyInternshipPage extends ConsumerWidget {
                   Text(
                     placement.supervisorFeedback!,
                     style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.red.shade800,
-                        height: 1.5),
+                        fontSize: 14, color: Colors.red.shade800, height: 1.5),
                   ),
                 ],
               ),
@@ -401,10 +397,11 @@ class MyInternshipPage extends ConsumerWidget {
         // Timeline card
         if (placement.status == PlacementStatus.approved ||
             placement.status == PlacementStatus.active ||
-            placement.status == PlacementStatus.completed) ...[
+            placement.status == PlacementStatus.completed ||
+            placement.status == PlacementStatus.extended) ...[
           Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -442,8 +439,7 @@ class MyInternshipPage extends ConsumerWidget {
                       children: [
                         Text(
                           '${placement.weeksCompleted} / ${placement.totalWeeks} weeks',
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           '${placement.progressPercentage.toStringAsFixed(0)}%',
@@ -471,10 +467,13 @@ class MyInternshipPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
+          _SupervisorVisitsCard(placement: placement),
+          const SizedBox(height: 12),
         ],
 
         if (placement.status == PlacementStatus.active ||
-            placement.status == PlacementStatus.completed) ...[
+            placement.status == PlacementStatus.completed ||
+            placement.status == PlacementStatus.extended) ...[
           finalReportAsync.when(
             data: (report) => _buildFinalReportCard(
               context,
@@ -512,8 +511,8 @@ class MyInternshipPage extends ConsumerWidget {
         // Acceptance letter
         if (placement.acceptanceLetterUrl != null)
           Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
               leading: Container(
@@ -522,8 +521,7 @@ class MyInternshipPage extends ConsumerWidget {
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child:
-                    Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
+                child: Icon(Icons.picture_as_pdf, color: Colors.red.shade600),
               ),
               title: const Text('Acceptance Letter',
                   style: TextStyle(fontWeight: FontWeight.w600)),
@@ -741,8 +739,7 @@ class MyInternshipPage extends ConsumerWidget {
               companyEvaluation == null) {
             companyEvaluation = evaluation;
           }
-          if (evaluation.evaluatorType ==
-                  EvaluationType.universitySupervisor &&
+          if (evaluation.evaluatorType == EvaluationType.universitySupervisor &&
               universityEvaluation == null) {
             universityEvaluation = evaluation;
           }
@@ -1013,8 +1010,7 @@ class MyInternshipPage extends ConsumerWidget {
 
   // ── Error card ───────────────────────────────────────────────────────────
 
-  Widget _buildErrorCard(
-      BuildContext context, WidgetRef ref, Object error) {
+  Widget _buildErrorCard(BuildContext context, WidgetRef ref, Object error) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
@@ -1035,6 +1031,558 @@ class MyInternshipPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+// ============================================================================
+// SUPERVISOR VISITS
+// ============================================================================
+
+class _SupervisorVisitsCard extends ConsumerStatefulWidget {
+  const _SupervisorVisitsCard({required this.placement});
+
+  final PlacementModel placement;
+
+  @override
+  ConsumerState<_SupervisorVisitsCard> createState() =>
+      _SupervisorVisitsCardState();
+}
+
+class _SupervisorVisitsCardState extends ConsumerState<_SupervisorVisitsCard> {
+  int? _savingVisitNumber;
+
+  Future<void> _editVisit(SupervisorVisitRecord visit) async {
+    final result = await _showVisitEditor(visit);
+    if (result == null) return;
+
+    setState(() => _savingVisitNumber = visit.visitNumber);
+
+    try {
+      await ref.read(supervisorVisitControllerProvider).updateVisit(
+            placement: widget.placement,
+            visitNumber: visit.visitNumber,
+            status: result.status,
+            visitDate: result.visitDate,
+            notes: result.notes,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Visit ${visit.visitNumber} updated'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Could not update visit ${visit.visitNumber}: $error'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingVisitNumber = null);
+      }
+    }
+  }
+
+  Future<_VisitEditResult?> _showVisitEditor(
+    SupervisorVisitRecord visit,
+  ) async {
+    final notesController = TextEditingController(text: visit.notes ?? '');
+    var selectedStatus = visit.status;
+    var selectedDate = visit.visitDate;
+
+    try {
+      return await showModalBottomSheet<_VisitEditResult>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          final theme = Theme.of(context);
+
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                  top: 16,
+                ),
+                child: Material(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.event_note_rounded,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Visit ${visit.visitNumber}',
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Record whether the supervisor visit happened.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Status',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: SupervisorVisitStatus.values
+                              .map(
+                                (status) => ChoiceChip(
+                                  label: Text(_visitStatusLabel(status)),
+                                  selected: selectedStatus == status,
+                                  onSelected: (_) {
+                                    setModalState(() {
+                                      selectedStatus = status;
+                                      if (status !=
+                                          SupervisorVisitStatus.visited) {
+                                        selectedDate = null;
+                                      }
+                                      if (status ==
+                                          SupervisorVisitStatus.pending) {
+                                        notesController.clear();
+                                      }
+                                    });
+                                  },
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                        if (selectedStatus ==
+                            SupervisorVisitStatus.visited) ...[
+                          const SizedBox(height: 20),
+                          Text(
+                            'Visit date',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          InkWell(
+                            onTap: () async {
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: selectedDate ?? DateTime.now(),
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+
+                              if (pickedDate != null) {
+                                setModalState(() => selectedDate = pickedDate);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(14),
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.calendar_today_outlined),
+                              ),
+                              child: Text(
+                                selectedDate == null
+                                    ? 'Select date'
+                                    : DateFormat('MMM dd, yyyy')
+                                        .format(selectedDate!),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (selectedStatus !=
+                            SupervisorVisitStatus.pending) ...[
+                          const SizedBox(height: 20),
+                          Text(
+                            'Notes',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: notesController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: selectedStatus ==
+                                      SupervisorVisitStatus.notVisited
+                                  ? 'Optional reason or follow-up note'
+                                  : 'Optional details about the visit',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(
+                                    _VisitEditResult(
+                                      status: selectedStatus,
+                                      visitDate: selectedStatus ==
+                                              SupervisorVisitStatus.visited
+                                          ? (selectedDate ?? DateTime.now())
+                                          : null,
+                                      notes: notesController.text.trim(),
+                                    ),
+                                  );
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      notesController.dispose();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final visits = widget.placement.supervisorVisitSlots;
+    final completedCount = widget.placement.completedSupervisorVisitCount;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _CardHeader(
+                        icon: Icons.supervisor_account_outlined,
+                        title: 'Supervisor Visits',
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Two university supervisor visits are usually expected during internship. Update this section after each visit.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _VisitProgressBadge(completedCount: completedCount),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            ...visits.map(
+              (visit) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _VisitStatusTile(
+                  visit: visit,
+                  isSaving: _savingVisitNumber == visit.visitNumber,
+                  onUpdate: () => _editVisit(visit),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisitStatusTile extends StatelessWidget {
+  const _VisitStatusTile({
+    required this.visit,
+    required this.isSaving,
+    required this.onUpdate,
+  });
+
+  final SupervisorVisitRecord visit;
+  final bool isSaving;
+  final VoidCallback onUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColor = _visitStatusColor(visit.status);
+    final subtitle = switch (visit.status) {
+      SupervisorVisitStatus.visited when visit.visitDate != null =>
+        'Visited on ${DateFormat('MMM dd, yyyy').format(visit.visitDate!)}',
+      SupervisorVisitStatus.visited => 'Visit recorded',
+      SupervisorVisitStatus.notVisited => visit.notes?.trim().isNotEmpty == true
+          ? visit.notes!.trim()
+          : 'Marked as not visited',
+      SupervisorVisitStatus.pending => 'Not yet recorded',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withOpacity(0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${visit.visitNumber}',
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Visit ${visit.visitNumber}',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    _VisitStatusChip(status: visit.status),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+                if (visit.status == SupervisorVisitStatus.visited &&
+                    visit.notes?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    visit.notes!.trim(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: isSaving
+                      ? SizedBox(
+                          height: 36,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: statusColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Saving...',
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: onUpdate,
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Update'),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VisitProgressBadge extends StatelessWidget {
+  const _VisitProgressBadge({required this.completedCount});
+
+  final int completedCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = completedCount == 2
+        ? Colors.green
+        : completedCount == 1
+            ? Colors.orange
+            : Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        '$completedCount / 2 done',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _VisitStatusChip extends StatelessWidget {
+  const _VisitStatusChip({required this.status});
+
+  final SupervisorVisitStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _visitStatusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _visitStatusLabel(status),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _VisitEditResult {
+  const _VisitEditResult({
+    required this.status,
+    this.visitDate,
+    this.notes,
+  });
+
+  final SupervisorVisitStatus status;
+  final DateTime? visitDate;
+  final String? notes;
+}
+
+Color _visitStatusColor(SupervisorVisitStatus status) {
+  switch (status) {
+    case SupervisorVisitStatus.visited:
+      return Colors.green;
+    case SupervisorVisitStatus.notVisited:
+      return Colors.red;
+    case SupervisorVisitStatus.pending:
+      return Colors.orange;
+  }
+}
+
+String _visitStatusLabel(SupervisorVisitStatus status) {
+  switch (status) {
+    case SupervisorVisitStatus.visited:
+      return 'Visited';
+    case SupervisorVisitStatus.notVisited:
+      return 'Not visited';
+    case SupervisorVisitStatus.pending:
+      return 'Pending';
   }
 }
 
@@ -1097,8 +1645,8 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.bold, color: color),
+        style:
+            TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
@@ -1126,8 +1674,7 @@ class _CardHeader extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           title,
-          style:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ],
     );
@@ -1148,8 +1695,7 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon,
-            size: 18,
-            color: Theme.of(context).colorScheme.onSurfaceVariant),
+            size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -1158,8 +1704,7 @@ class _InfoRow extends StatelessWidget {
               Text(label,
                   style: TextStyle(
                       fontSize: 11,
-                      color:
-                          Theme.of(context).colorScheme.onSurfaceVariant)),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 2),
               Text(value,
                   style: const TextStyle(
@@ -1198,9 +1743,7 @@ class _CopyableRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
-            Icon(icon,
-                size: 18,
-                color: Theme.of(context).colorScheme.primary),
+            Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1209,9 +1752,8 @@ class _CopyableRow extends StatelessWidget {
                   Text(label,
                       style: TextStyle(
                           fontSize: 11,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant)),
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 2),
                   Text(value,
                       style: TextStyle(

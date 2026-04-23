@@ -4,21 +4,113 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'placement_model.freezed.dart';
 part 'placement_model.g.dart';
 
-// ============================================================================
-// PLACEMENT STATUS
-// Reflects the real MUST workflow:
-//   Student uploads letter → University Supervisor reviews → Internship begins
-// ============================================================================
-
 enum PlacementStatus {
-  pendingSupervisorReview, // Letter uploaded, awaiting university supervisor approval
-  approved,                // Supervisor approved — student can begin internship
-  rejected,                // Supervisor rejected — student must resubmit with fixes
-  active,                  // Internship in progress
-  completed,               // Successfully completed
-  cancelled,               // Cancelled before completion
-  terminated,              // Ended early
-  extended,                // Duration extended
+  pendingSupervisorReview,
+  approved,
+  rejected,
+  active,
+  completed,
+  cancelled,
+  terminated,
+  extended,
+}
+
+enum SupervisorVisitStatus {
+  pending,
+  visited,
+  notVisited,
+}
+
+DateTime? _parsePlacementDate(dynamic value) {
+  if (value == null) return null;
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+String? _normalizePlacementText(dynamic value) {
+  if (value == null) return null;
+  final trimmed = value.toString().trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+List<SupervisorVisitRecord> _parseSupervisorVisits(dynamic value) {
+  if (value is! Iterable) {
+    return const <SupervisorVisitRecord>[];
+  }
+
+  final visits = <SupervisorVisitRecord>[];
+  var fallbackVisitNumber = 1;
+
+  for (final rawVisit in value) {
+    if (rawVisit is! Map) continue;
+
+    final visitMap = Map<String, dynamic>.from(rawVisit);
+    final visitNumber =
+        (visitMap['visitNumber'] as num?)?.toInt() ?? fallbackVisitNumber;
+
+    visits.add(
+      SupervisorVisitRecord.fromJson({
+        'visitNumber': visitNumber,
+        'status': visitMap['status'] ?? SupervisorVisitStatus.pending.name,
+        'visitDate':
+            _parsePlacementDate(visitMap['visitDate'])?.toIso8601String(),
+        'notes': _normalizePlacementText(visitMap['notes']),
+        'updatedAt':
+            _parsePlacementDate(visitMap['updatedAt'])?.toIso8601String(),
+      }),
+    );
+
+    fallbackVisitNumber++;
+  }
+
+  visits.sort((a, b) => a.visitNumber.compareTo(b.visitNumber));
+  return visits;
+}
+
+List<Map<String, dynamic>> _supervisorVisitsToFirestore(
+  List<SupervisorVisitRecord> visits,
+) {
+  return visits.map((visit) {
+    final json = visit.toJson();
+    json['status'] = visit.status.name;
+
+    if (visit.visitDate != null) {
+      json['visitDate'] = Timestamp.fromDate(visit.visitDate!);
+    } else {
+      json.remove('visitDate');
+    }
+
+    if (visit.updatedAt != null) {
+      json['updatedAt'] = Timestamp.fromDate(visit.updatedAt!);
+    } else {
+      json.remove('updatedAt');
+    }
+
+    final notes = visit.notes?.trim();
+    if (notes == null || notes.isEmpty) {
+      json.remove('notes');
+    } else {
+      json['notes'] = notes;
+    }
+
+    return json;
+  }).toList(growable: false);
+}
+
+@freezed
+class SupervisorVisitRecord with _$SupervisorVisitRecord {
+  const factory SupervisorVisitRecord({
+    required int visitNumber,
+    @Default(SupervisorVisitStatus.pending) SupervisorVisitStatus status,
+    DateTime? visitDate,
+    String? notes,
+    DateTime? updatedAt,
+  }) = _SupervisorVisitRecord;
+
+  factory SupervisorVisitRecord.fromJson(Map<String, dynamic> json) =>
+      _$SupervisorVisitRecordFromJson(json);
 }
 
 @freezed
@@ -27,32 +119,18 @@ class PlacementModel with _$PlacementModel {
     required String id,
     required String studentId,
     required String companyId,
-
-    // University supervisor (auto-assigned via algorithm)
     String? universitySupervisorId,
-
-    // Company supervisor details (from acceptance letter)
     String? companySupervisorName,
     String? companySupervisorEmail,
     String? companySupervisorPhone,
     String? companySupervisorId,
-
-    // Acceptance letter
     String? acceptanceLetterUrl,
     String? acceptanceLetterFileName,
     DateTime? letterUploadedAt,
-
-    // ── Approval (now supervisor-driven, not admin) ──────────────────────────
     @Default(PlacementStatus.pendingSupervisorReview) PlacementStatus status,
-
-    /// Feedback left by the university supervisor on rejection.
-    /// Student sees this so they know what to fix before resubmitting.
     String? supervisorFeedback,
-
     DateTime? supervisorApprovedAt,
     DateTime? supervisorRejectedAt,
-
-    // ── Internship timeline ──────────────────────────────────────────────────
     required String academicYear,
     DateTime? actualStartDate,
     DateTime? startDate,
@@ -61,20 +139,16 @@ class PlacementModel with _$PlacementModel {
     @Default(12) int totalWeeks,
     @Default(0) int weeksCompleted,
     @Default(0.0) double progressPercentage,
-
-    // ── Additional info ──────────────────────────────────────────────────────
+    @Default(<SupervisorVisitRecord>[])
+    List<SupervisorVisitRecord> supervisorVisits,
     String? studentNotes,
     String? remarks,
-
-    // ── Timestamps ───────────────────────────────────────────────────────────
     DateTime? createdAt,
     DateTime? updatedAt,
   }) = _PlacementModel;
 
   factory PlacementModel.fromJson(Map<String, dynamic> json) =>
       _$PlacementModelFromJson(json);
-
-  // ── Firestore converters ─────────────────────────────────────────────────
 
   static PlacementModel fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -83,49 +157,40 @@ class PlacementModel with _$PlacementModel {
     final data = doc.data();
     if (data == null) throw Exception('Document data is null');
 
-    DateTime? parseDate(dynamic value) {
-      if (value == null) return null;
-      if (value is Timestamp) return value.toDate();
-      if (value is DateTime) return value;
-      if (value is String) return DateTime.tryParse(value);
-      return null;
-    }
-
-    String? normalizeOptionalText(dynamic value) {
-      if (value == null) return null;
-      final trimmed = value.toString().trim();
-      return trimmed.isEmpty ? null : trimmed;
-    }
-
-    // ── Legacy migration: map old 'pending' status to new name ──────────────
     final rawStatus = data['status'] as String?;
     final migratedStatus =
         rawStatus == 'pending' ? 'pendingSupervisorReview' : rawStatus;
+    final supervisorVisits = _parseSupervisorVisits(data['supervisorVisits']);
 
     return PlacementModel.fromJson({
       ...data,
       'id': doc.id,
       'status': migratedStatus,
       'companySupervisorName':
-          normalizeOptionalText(data['companySupervisorName']),
+          _normalizePlacementText(data['companySupervisorName']),
       'companySupervisorEmail':
-          normalizeOptionalText(data['companySupervisorEmail']),
+          _normalizePlacementText(data['companySupervisorEmail']),
       'companySupervisorPhone':
-          normalizeOptionalText(data['companySupervisorPhone']),
+          _normalizePlacementText(data['companySupervisorPhone']),
       'companySupervisorId':
-          normalizeOptionalText(data['companySupervisorId']),
+          _normalizePlacementText(data['companySupervisorId']),
       'letterUploadedAt':
-          parseDate(data['letterUploadedAt'])?.toIso8601String(),
+          _parsePlacementDate(data['letterUploadedAt'])?.toIso8601String(),
       'supervisorApprovedAt':
-          parseDate(data['supervisorApprovedAt'])?.toIso8601String(),
+          _parsePlacementDate(data['supervisorApprovedAt'])?.toIso8601String(),
       'supervisorRejectedAt':
-          parseDate(data['supervisorRejectedAt'])?.toIso8601String(),
-      'actualStartDate': parseDate(data['actualStartDate'])?.toIso8601String(),
-      'startDate': parseDate(data['startDate'])?.toIso8601String(),
-      'endDate': parseDate(data['endDate'])?.toIso8601String(),
-      'actualEndDate': parseDate(data['actualEndDate'])?.toIso8601String(),
-      'createdAt': parseDate(data['createdAt'])?.toIso8601String(),
-      'updatedAt': parseDate(data['updatedAt'])?.toIso8601String(),
+          _parsePlacementDate(data['supervisorRejectedAt'])?.toIso8601String(),
+      'actualStartDate':
+          _parsePlacementDate(data['actualStartDate'])?.toIso8601String(),
+      'startDate': _parsePlacementDate(data['startDate'])?.toIso8601String(),
+      'endDate': _parsePlacementDate(data['endDate'])?.toIso8601String(),
+      'actualEndDate':
+          _parsePlacementDate(data['actualEndDate'])?.toIso8601String(),
+      'supervisorVisits': supervisorVisits
+          .map((visit) => visit.toJson())
+          .toList(growable: false),
+      'createdAt': _parsePlacementDate(data['createdAt'])?.toIso8601String(),
+      'updatedAt': _parsePlacementDate(data['updatedAt'])?.toIso8601String(),
     });
   }
 
@@ -136,8 +201,10 @@ class PlacementModel with _$PlacementModel {
     final json = placement.toJson();
     json.remove('id');
 
-    void setTimestamp(String key, DateTime? dt) {
-      if (dt != null) json[key] = Timestamp.fromDate(dt);
+    void setTimestamp(String key, DateTime? value) {
+      if (value != null) {
+        json[key] = Timestamp.fromDate(value);
+      }
     }
 
     setTimestamp('letterUploadedAt', placement.letterUploadedAt);
@@ -151,12 +218,32 @@ class PlacementModel with _$PlacementModel {
     setTimestamp('updatedAt', placement.updatedAt);
 
     json['status'] = placement.status.name;
+    json['supervisorVisits'] =
+        _supervisorVisitsToFirestore(placement.supervisorVisitSlots);
 
     return json;
   }
 }
 
 extension PlacementTimelineX on PlacementModel {
+  List<SupervisorVisitRecord> get supervisorVisitSlots {
+    final visitsByNumber = {
+      for (final visit in supervisorVisits) visit.visitNumber: visit,
+    };
+
+    return List<SupervisorVisitRecord>.generate(
+      2,
+      (index) =>
+          visitsByNumber[index + 1] ??
+          SupervisorVisitRecord(visitNumber: index + 1),
+      growable: false,
+    );
+  }
+
+  int get completedSupervisorVisitCount => supervisorVisitSlots
+      .where((visit) => visit.status == SupervisorVisitStatus.visited)
+      .length;
+
   bool get hasActiveCountdownReminder =>
       status == PlacementStatus.active || status == PlacementStatus.extended;
 

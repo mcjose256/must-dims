@@ -14,6 +14,236 @@ T _$identity<T>(T value) => value;
 final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
+SupervisorVisitRecord _$SupervisorVisitRecordFromJson(
+    Map<String, dynamic> json) {
+  return _SupervisorVisitRecord.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SupervisorVisitRecord {
+  int get visitNumber => throw _privateConstructorUsedError;
+  SupervisorVisitStatus get status => throw _privateConstructorUsedError;
+  DateTime? get visitDate => throw _privateConstructorUsedError;
+  String? get notes => throw _privateConstructorUsedError;
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
+
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  @JsonKey(ignore: true)
+  $SupervisorVisitRecordCopyWith<SupervisorVisitRecord> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SupervisorVisitRecordCopyWith<$Res> {
+  factory $SupervisorVisitRecordCopyWith(SupervisorVisitRecord value,
+          $Res Function(SupervisorVisitRecord) then) =
+      _$SupervisorVisitRecordCopyWithImpl<$Res, SupervisorVisitRecord>;
+  @useResult
+  $Res call(
+      {int visitNumber,
+      SupervisorVisitStatus status,
+      DateTime? visitDate,
+      String? notes,
+      DateTime? updatedAt});
+}
+
+/// @nodoc
+class _$SupervisorVisitRecordCopyWithImpl<$Res,
+        $Val extends SupervisorVisitRecord>
+    implements $SupervisorVisitRecordCopyWith<$Res> {
+  _$SupervisorVisitRecordCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? visitNumber = null,
+    Object? status = null,
+    Object? visitDate = freezed,
+    Object? notes = freezed,
+    Object? updatedAt = freezed,
+  }) {
+    return _then(_value.copyWith(
+      visitNumber: null == visitNumber
+          ? _value.visitNumber
+          : visitNumber // ignore: cast_nullable_to_non_nullable
+              as int,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as SupervisorVisitStatus,
+      visitDate: freezed == visitDate
+          ? _value.visitDate
+          : visitDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      notes: freezed == notes
+          ? _value.notes
+          : notes // ignore: cast_nullable_to_non_nullable
+              as String?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$SupervisorVisitRecordImplCopyWith<$Res>
+    implements $SupervisorVisitRecordCopyWith<$Res> {
+  factory _$$SupervisorVisitRecordImplCopyWith(
+          _$SupervisorVisitRecordImpl value,
+          $Res Function(_$SupervisorVisitRecordImpl) then) =
+      __$$SupervisorVisitRecordImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {int visitNumber,
+      SupervisorVisitStatus status,
+      DateTime? visitDate,
+      String? notes,
+      DateTime? updatedAt});
+}
+
+/// @nodoc
+class __$$SupervisorVisitRecordImplCopyWithImpl<$Res>
+    extends _$SupervisorVisitRecordCopyWithImpl<$Res,
+        _$SupervisorVisitRecordImpl>
+    implements _$$SupervisorVisitRecordImplCopyWith<$Res> {
+  __$$SupervisorVisitRecordImplCopyWithImpl(_$SupervisorVisitRecordImpl _value,
+      $Res Function(_$SupervisorVisitRecordImpl) _then)
+      : super(_value, _then);
+
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? visitNumber = null,
+    Object? status = null,
+    Object? visitDate = freezed,
+    Object? notes = freezed,
+    Object? updatedAt = freezed,
+  }) {
+    return _then(_$SupervisorVisitRecordImpl(
+      visitNumber: null == visitNumber
+          ? _value.visitNumber
+          : visitNumber // ignore: cast_nullable_to_non_nullable
+              as int,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as SupervisorVisitStatus,
+      visitDate: freezed == visitDate
+          ? _value.visitDate
+          : visitDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      notes: freezed == notes
+          ? _value.notes
+          : notes // ignore: cast_nullable_to_non_nullable
+              as String?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SupervisorVisitRecordImpl implements _SupervisorVisitRecord {
+  const _$SupervisorVisitRecordImpl(
+      {required this.visitNumber,
+      this.status = SupervisorVisitStatus.pending,
+      this.visitDate,
+      this.notes,
+      this.updatedAt});
+
+  factory _$SupervisorVisitRecordImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SupervisorVisitRecordImplFromJson(json);
+
+  @override
+  final int visitNumber;
+  @override
+  @JsonKey()
+  final SupervisorVisitStatus status;
+  @override
+  final DateTime? visitDate;
+  @override
+  final String? notes;
+  @override
+  final DateTime? updatedAt;
+
+  @override
+  String toString() {
+    return 'SupervisorVisitRecord(visitNumber: $visitNumber, status: $status, visitDate: $visitDate, notes: $notes, updatedAt: $updatedAt)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SupervisorVisitRecordImpl &&
+            (identical(other.visitNumber, visitNumber) ||
+                other.visitNumber == visitNumber) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.visitDate, visitDate) ||
+                other.visitDate == visitDate) &&
+            (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
+  }
+
+  @JsonKey(ignore: true)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType, visitNumber, status, visitDate, notes, updatedAt);
+
+  @JsonKey(ignore: true)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SupervisorVisitRecordImplCopyWith<_$SupervisorVisitRecordImpl>
+      get copyWith => __$$SupervisorVisitRecordImplCopyWithImpl<
+          _$SupervisorVisitRecordImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SupervisorVisitRecordImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _SupervisorVisitRecord implements SupervisorVisitRecord {
+  const factory _SupervisorVisitRecord(
+      {required final int visitNumber,
+      final SupervisorVisitStatus status,
+      final DateTime? visitDate,
+      final String? notes,
+      final DateTime? updatedAt}) = _$SupervisorVisitRecordImpl;
+
+  factory _SupervisorVisitRecord.fromJson(Map<String, dynamic> json) =
+      _$SupervisorVisitRecordImpl.fromJson;
+
+  @override
+  int get visitNumber;
+  @override
+  SupervisorVisitStatus get status;
+  @override
+  DateTime? get visitDate;
+  @override
+  String? get notes;
+  @override
+  DateTime? get updatedAt;
+  @override
+  @JsonKey(ignore: true)
+  _$$SupervisorVisitRecordImplCopyWith<_$SupervisorVisitRecordImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
 PlacementModel _$PlacementModelFromJson(Map<String, dynamic> json) {
   return _PlacementModel.fromJson(json);
 }
@@ -22,27 +252,19 @@ PlacementModel _$PlacementModelFromJson(Map<String, dynamic> json) {
 mixin _$PlacementModel {
   String get id => throw _privateConstructorUsedError;
   String get studentId => throw _privateConstructorUsedError;
-  String get companyId =>
-      throw _privateConstructorUsedError; // University supervisor (auto-assigned via algorithm)
-  String? get universitySupervisorId =>
-      throw _privateConstructorUsedError; // Company supervisor details (from acceptance letter)
+  String get companyId => throw _privateConstructorUsedError;
+  String? get universitySupervisorId => throw _privateConstructorUsedError;
   String? get companySupervisorName => throw _privateConstructorUsedError;
   String? get companySupervisorEmail => throw _privateConstructorUsedError;
   String? get companySupervisorPhone => throw _privateConstructorUsedError;
-  String? get companySupervisorId =>
-      throw _privateConstructorUsedError; // Acceptance letter
+  String? get companySupervisorId => throw _privateConstructorUsedError;
   String? get acceptanceLetterUrl => throw _privateConstructorUsedError;
   String? get acceptanceLetterFileName => throw _privateConstructorUsedError;
-  DateTime? get letterUploadedAt =>
-      throw _privateConstructorUsedError; // ── Approval (now supervisor-driven, not admin) ──────────────────────────
+  DateTime? get letterUploadedAt => throw _privateConstructorUsedError;
   PlacementStatus get status => throw _privateConstructorUsedError;
-
-  /// Feedback left by the university supervisor on rejection.
-  /// Student sees this so they know what to fix before resubmitting.
   String? get supervisorFeedback => throw _privateConstructorUsedError;
   DateTime? get supervisorApprovedAt => throw _privateConstructorUsedError;
-  DateTime? get supervisorRejectedAt =>
-      throw _privateConstructorUsedError; // ── Internship timeline ──────────────────────────────────────────────────
+  DateTime? get supervisorRejectedAt => throw _privateConstructorUsedError;
   String get academicYear => throw _privateConstructorUsedError;
   DateTime? get actualStartDate => throw _privateConstructorUsedError;
   DateTime? get startDate => throw _privateConstructorUsedError;
@@ -50,11 +272,11 @@ mixin _$PlacementModel {
   DateTime? get actualEndDate => throw _privateConstructorUsedError;
   int get totalWeeks => throw _privateConstructorUsedError;
   int get weeksCompleted => throw _privateConstructorUsedError;
-  double get progressPercentage =>
-      throw _privateConstructorUsedError; // ── Additional info ──────────────────────────────────────────────────────
+  double get progressPercentage => throw _privateConstructorUsedError;
+  List<SupervisorVisitRecord> get supervisorVisits =>
+      throw _privateConstructorUsedError;
   String? get studentNotes => throw _privateConstructorUsedError;
-  String? get remarks =>
-      throw _privateConstructorUsedError; // ── Timestamps ───────────────────────────────────────────────────────────
+  String? get remarks => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -94,6 +316,7 @@ abstract class $PlacementModelCopyWith<$Res> {
       int totalWeeks,
       int weeksCompleted,
       double progressPercentage,
+      List<SupervisorVisitRecord> supervisorVisits,
       String? studentNotes,
       String? remarks,
       DateTime? createdAt,
@@ -136,6 +359,7 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
     Object? totalWeeks = null,
     Object? weeksCompleted = null,
     Object? progressPercentage = null,
+    Object? supervisorVisits = null,
     Object? studentNotes = freezed,
     Object? remarks = freezed,
     Object? createdAt = freezed,
@@ -234,6 +458,10 @@ class _$PlacementModelCopyWithImpl<$Res, $Val extends PlacementModel>
           ? _value.progressPercentage
           : progressPercentage // ignore: cast_nullable_to_non_nullable
               as double,
+      supervisorVisits: null == supervisorVisits
+          ? _value.supervisorVisits
+          : supervisorVisits // ignore: cast_nullable_to_non_nullable
+              as List<SupervisorVisitRecord>,
       studentNotes: freezed == studentNotes
           ? _value.studentNotes
           : studentNotes // ignore: cast_nullable_to_non_nullable
@@ -286,6 +514,7 @@ abstract class _$$PlacementModelImplCopyWith<$Res>
       int totalWeeks,
       int weeksCompleted,
       double progressPercentage,
+      List<SupervisorVisitRecord> supervisorVisits,
       String? studentNotes,
       String? remarks,
       DateTime? createdAt,
@@ -326,6 +555,7 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
     Object? totalWeeks = null,
     Object? weeksCompleted = null,
     Object? progressPercentage = null,
+    Object? supervisorVisits = null,
     Object? studentNotes = freezed,
     Object? remarks = freezed,
     Object? createdAt = freezed,
@@ -424,6 +654,10 @@ class __$$PlacementModelImplCopyWithImpl<$Res>
           ? _value.progressPercentage
           : progressPercentage // ignore: cast_nullable_to_non_nullable
               as double,
+      supervisorVisits: null == supervisorVisits
+          ? _value._supervisorVisits
+          : supervisorVisits // ignore: cast_nullable_to_non_nullable
+              as List<SupervisorVisitRecord>,
       studentNotes: freezed == studentNotes
           ? _value.studentNotes
           : studentNotes // ignore: cast_nullable_to_non_nullable
@@ -471,10 +705,13 @@ class _$PlacementModelImpl implements _PlacementModel {
       this.totalWeeks = 12,
       this.weeksCompleted = 0,
       this.progressPercentage = 0.0,
+      final List<SupervisorVisitRecord> supervisorVisits =
+          const <SupervisorVisitRecord>[],
       this.studentNotes,
       this.remarks,
       this.createdAt,
-      this.updatedAt});
+      this.updatedAt})
+      : _supervisorVisits = supervisorVisits;
 
   factory _$PlacementModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$PlacementModelImplFromJson(json);
@@ -485,10 +722,8 @@ class _$PlacementModelImpl implements _PlacementModel {
   final String studentId;
   @override
   final String companyId;
-// University supervisor (auto-assigned via algorithm)
   @override
   final String? universitySupervisorId;
-// Company supervisor details (from acceptance letter)
   @override
   final String? companySupervisorName;
   @override
@@ -497,27 +732,21 @@ class _$PlacementModelImpl implements _PlacementModel {
   final String? companySupervisorPhone;
   @override
   final String? companySupervisorId;
-// Acceptance letter
   @override
   final String? acceptanceLetterUrl;
   @override
   final String? acceptanceLetterFileName;
   @override
   final DateTime? letterUploadedAt;
-// ── Approval (now supervisor-driven, not admin) ──────────────────────────
   @override
   @JsonKey()
   final PlacementStatus status;
-
-  /// Feedback left by the university supervisor on rejection.
-  /// Student sees this so they know what to fix before resubmitting.
   @override
   final String? supervisorFeedback;
   @override
   final DateTime? supervisorApprovedAt;
   @override
   final DateTime? supervisorRejectedAt;
-// ── Internship timeline ──────────────────────────────────────────────────
   @override
   final String academicYear;
   @override
@@ -537,12 +766,20 @@ class _$PlacementModelImpl implements _PlacementModel {
   @override
   @JsonKey()
   final double progressPercentage;
-// ── Additional info ──────────────────────────────────────────────────────
+  final List<SupervisorVisitRecord> _supervisorVisits;
+  @override
+  @JsonKey()
+  List<SupervisorVisitRecord> get supervisorVisits {
+    if (_supervisorVisits is EqualUnmodifiableListView)
+      return _supervisorVisits;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_supervisorVisits);
+  }
+
   @override
   final String? studentNotes;
   @override
   final String? remarks;
-// ── Timestamps ───────────────────────────────────────────────────────────
   @override
   final DateTime? createdAt;
   @override
@@ -550,7 +787,7 @@ class _$PlacementModelImpl implements _PlacementModel {
 
   @override
   String toString() {
-    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, supervisorFeedback: $supervisorFeedback, supervisorApprovedAt: $supervisorApprovedAt, supervisorRejectedAt: $supervisorRejectedAt, academicYear: $academicYear, actualStartDate: $actualStartDate, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'PlacementModel(id: $id, studentId: $studentId, companyId: $companyId, universitySupervisorId: $universitySupervisorId, companySupervisorName: $companySupervisorName, companySupervisorEmail: $companySupervisorEmail, companySupervisorPhone: $companySupervisorPhone, companySupervisorId: $companySupervisorId, acceptanceLetterUrl: $acceptanceLetterUrl, acceptanceLetterFileName: $acceptanceLetterFileName, letterUploadedAt: $letterUploadedAt, status: $status, supervisorFeedback: $supervisorFeedback, supervisorApprovedAt: $supervisorApprovedAt, supervisorRejectedAt: $supervisorRejectedAt, academicYear: $academicYear, actualStartDate: $actualStartDate, startDate: $startDate, endDate: $endDate, actualEndDate: $actualEndDate, totalWeeks: $totalWeeks, weeksCompleted: $weeksCompleted, progressPercentage: $progressPercentage, supervisorVisits: $supervisorVisits, studentNotes: $studentNotes, remarks: $remarks, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -602,6 +839,8 @@ class _$PlacementModelImpl implements _PlacementModel {
                 other.weeksCompleted == weeksCompleted) &&
             (identical(other.progressPercentage, progressPercentage) ||
                 other.progressPercentage == progressPercentage) &&
+            const DeepCollectionEquality()
+                .equals(other._supervisorVisits, _supervisorVisits) &&
             (identical(other.studentNotes, studentNotes) ||
                 other.studentNotes == studentNotes) &&
             (identical(other.remarks, remarks) || other.remarks == remarks) &&
@@ -638,6 +877,7 @@ class _$PlacementModelImpl implements _PlacementModel {
         totalWeeks,
         weeksCompleted,
         progressPercentage,
+        const DeepCollectionEquality().hash(_supervisorVisits),
         studentNotes,
         remarks,
         createdAt,
@@ -684,6 +924,7 @@ abstract class _PlacementModel implements PlacementModel {
       final int totalWeeks,
       final int weeksCompleted,
       final double progressPercentage,
+      final List<SupervisorVisitRecord> supervisorVisits,
       final String? studentNotes,
       final String? remarks,
       final DateTime? createdAt,
@@ -698,9 +939,9 @@ abstract class _PlacementModel implements PlacementModel {
   String get studentId;
   @override
   String get companyId;
-  @override // University supervisor (auto-assigned via algorithm)
+  @override
   String? get universitySupervisorId;
-  @override // Company supervisor details (from acceptance letter)
+  @override
   String? get companySupervisorName;
   @override
   String? get companySupervisorEmail;
@@ -708,24 +949,21 @@ abstract class _PlacementModel implements PlacementModel {
   String? get companySupervisorPhone;
   @override
   String? get companySupervisorId;
-  @override // Acceptance letter
+  @override
   String? get acceptanceLetterUrl;
   @override
   String? get acceptanceLetterFileName;
   @override
   DateTime? get letterUploadedAt;
-  @override // ── Approval (now supervisor-driven, not admin) ──────────────────────────
+  @override
   PlacementStatus get status;
   @override
-
-  /// Feedback left by the university supervisor on rejection.
-  /// Student sees this so they know what to fix before resubmitting.
   String? get supervisorFeedback;
   @override
   DateTime? get supervisorApprovedAt;
   @override
   DateTime? get supervisorRejectedAt;
-  @override // ── Internship timeline ──────────────────────────────────────────────────
+  @override
   String get academicYear;
   @override
   DateTime? get actualStartDate;
@@ -741,11 +979,13 @@ abstract class _PlacementModel implements PlacementModel {
   int get weeksCompleted;
   @override
   double get progressPercentage;
-  @override // ── Additional info ──────────────────────────────────────────────────────
+  @override
+  List<SupervisorVisitRecord> get supervisorVisits;
+  @override
   String? get studentNotes;
   @override
   String? get remarks;
-  @override // ── Timestamps ───────────────────────────────────────────────────────────
+  @override
   DateTime? get createdAt;
   @override
   DateTime? get updatedAt;

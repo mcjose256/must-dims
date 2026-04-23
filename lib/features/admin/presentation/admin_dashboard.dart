@@ -12,6 +12,7 @@ import 'pages/pending_approvals_page.dart';
 import 'pages/pending_placements_page.dart';
 import 'pages/success_stories_management_page.dart';
 import 'pages/supervisor_allocation_page.dart';
+import 'pages/training_schedule_management_page.dart';
 import 'pages/users_management_page.dart';
 
 final selectedAdminTabProvider = StateProvider<int>((ref) => 0);
@@ -113,7 +114,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                       child: _AdminSidebar(
                         selectedTab: selectedTab,
                         onSelect: (index) {
-                          ref.read(selectedAdminTabProvider.notifier).state = index;
+                          ref.read(selectedAdminTabProvider.notifier).state =
+                              index;
                         },
                       ),
                     ),
@@ -179,6 +181,7 @@ class _AdminPageViewport extends StatelessWidget {
         UsersManagementPage(),
         PendingApprovalsPage(),
         SupervisorAllocationPage(),
+        TrainingScheduleManagementPage(),
         CompaniesManagementPage(),
         SuccessStoriesManagementPage(),
         PendingPlacementsPage(),
@@ -219,7 +222,8 @@ class _AdminSidebar extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(isDesktop ? 18 : 16, 16, isDesktop ? 18 : 16, 16),
+          padding: EdgeInsets.fromLTRB(
+              isDesktop ? 18 : 16, 16, isDesktop ? 18 : 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -421,8 +425,8 @@ class _AdminNavItem {
 
 const List<_AdminNavItem> _adminNavItems = [
   _AdminNavItem(
-    title: 'Admin Dashboard',
-    subtitle: 'MUST Administration',
+    title: 'Industrial Training Cordinator',
+    subtitle: 'MUST ',
     shortLabel: 'Overview',
     icon: Icons.dashboard_rounded,
   ),
@@ -444,6 +448,12 @@ const List<_AdminNavItem> _adminNavItems = [
     subtitle: 'MUST Administration',
     shortLabel: 'Assignments',
     icon: Icons.assignment_ind_rounded,
+  ),
+  _AdminNavItem(
+    title: 'Training Timeline',
+    subtitle: 'MUST Administration',
+    shortLabel: 'Timeline',
+    icon: Icons.timeline_rounded,
   ),
   _AdminNavItem(
     title: 'Companies',

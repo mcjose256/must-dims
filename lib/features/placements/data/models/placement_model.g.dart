@@ -6,6 +6,38 @@ part of 'placement_model.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+_$SupervisorVisitRecordImpl _$$SupervisorVisitRecordImplFromJson(
+        Map<String, dynamic> json) =>
+    _$SupervisorVisitRecordImpl(
+      visitNumber: (json['visitNumber'] as num).toInt(),
+      status:
+          $enumDecodeNullable(_$SupervisorVisitStatusEnumMap, json['status']) ??
+              SupervisorVisitStatus.pending,
+      visitDate: json['visitDate'] == null
+          ? null
+          : DateTime.parse(json['visitDate'] as String),
+      notes: json['notes'] as String?,
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
+    );
+
+Map<String, dynamic> _$$SupervisorVisitRecordImplToJson(
+        _$SupervisorVisitRecordImpl instance) =>
+    <String, dynamic>{
+      'visitNumber': instance.visitNumber,
+      'status': _$SupervisorVisitStatusEnumMap[instance.status]!,
+      'visitDate': instance.visitDate?.toIso8601String(),
+      'notes': instance.notes,
+      'updatedAt': instance.updatedAt?.toIso8601String(),
+    };
+
+const _$SupervisorVisitStatusEnumMap = {
+  SupervisorVisitStatus.pending: 'pending',
+  SupervisorVisitStatus.visited: 'visited',
+  SupervisorVisitStatus.notVisited: 'notVisited',
+};
+
 _$PlacementModelImpl _$$PlacementModelImplFromJson(Map<String, dynamic> json) =>
     _$PlacementModelImpl(
       id: json['id'] as String,
@@ -47,6 +79,11 @@ _$PlacementModelImpl _$$PlacementModelImplFromJson(Map<String, dynamic> json) =>
       weeksCompleted: (json['weeksCompleted'] as num?)?.toInt() ?? 0,
       progressPercentage:
           (json['progressPercentage'] as num?)?.toDouble() ?? 0.0,
+      supervisorVisits: (json['supervisorVisits'] as List<dynamic>?)
+              ?.map((e) =>
+                  SupervisorVisitRecord.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <SupervisorVisitRecord>[],
       studentNotes: json['studentNotes'] as String?,
       remarks: json['remarks'] as String?,
       createdAt: json['createdAt'] == null
@@ -83,6 +120,7 @@ Map<String, dynamic> _$$PlacementModelImplToJson(
       'totalWeeks': instance.totalWeeks,
       'weeksCompleted': instance.weeksCompleted,
       'progressPercentage': instance.progressPercentage,
+      'supervisorVisits': instance.supervisorVisits,
       'studentNotes': instance.studentNotes,
       'remarks': instance.remarks,
       'createdAt': instance.createdAt?.toIso8601String(),

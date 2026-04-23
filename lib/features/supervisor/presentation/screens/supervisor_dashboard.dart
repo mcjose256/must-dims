@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dims/core/widgets/brand_app_bar_title.dart';
 import '../../../auth/controllers/auth_controller.dart';
 import 'supervisor_overview_content.dart';
+import 'supervisor_timeline_screen.dart';
 import 'supervisor_profile_screen.dart';
 
 class SupervisorDashboard extends StatefulWidget {
@@ -17,6 +18,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   final List<Widget> _screens = [
     const SupervisorOverviewContent(),
+    const SupervisorTimelineScreen(),
     const SupervisorProfileScreen(),
   ];
 
@@ -27,7 +29,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       appBar: AppBar(
         toolbarHeight: 72,
         title: BrandAppBarTitle(
-          title: _currentIndex == 0 ? 'Supervisor Dashboard' : 'Supervisor Profile',
+          title: _currentIndex == 0
+              ? 'Supervisor Dashboard'
+              : _currentIndex == 1
+                  ? 'Training Timeline'
+                  : 'Supervisor Profile',
           subtitle: 'Mbarara University of Science and Technology',
         ),
         actions: [
@@ -52,6 +58,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             icon: Icon(Icons.dashboard_outlined),
             activeIcon: Icon(Icons.dashboard),
             label: 'Overview',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.timeline_outlined),
+            activeIcon: Icon(Icons.timeline),
+            label: 'Timeline',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

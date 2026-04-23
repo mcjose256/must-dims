@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dims/features/auth/controllers/auth_controller.dart';
+import 'package:dims/features/placements/data/models/placement_model.dart';
 
 // ============================================================================
 // MODELS
@@ -40,6 +41,9 @@ class AdminStats {
 }
 
 class StudentPlacementReportRow {
+  static const int expectedSupervisorVisits = 2;
+  static const String unassignedSupervisorLabel = 'Not assigned';
+
   final String studentName;
   final String registrationNumber;
   final String program;
@@ -47,6 +51,9 @@ class StudentPlacementReportRow {
   final String supervisorName;
   final String companyName;
   final String district;
+  final String visitOneStatus;
+  final String visitTwoStatus;
+  final int visitsCompleted;
 
   const StudentPlacementReportRow({
     required this.studentName,
@@ -56,7 +63,46 @@ class StudentPlacementReportRow {
     required this.supervisorName,
     required this.companyName,
     required this.district,
+    required this.visitOneStatus,
+    required this.visitTwoStatus,
+    required this.visitsCompleted,
   });
+
+  bool get hasSupervisor => supervisorName != unassignedSupervisorLabel;
+
+  bool get isVisitTrackable =>
+      visitOneStatus != 'N/A' || visitTwoStatus != 'N/A';
+
+  bool get hasVisited => visitsCompleted > 0;
+
+  bool get hasNotVisited =>
+      visitOneStatus == 'Not visited' || visitTwoStatus == 'Not visited';
+
+  int get notVisitedCount => [visitOneStatus, visitTwoStatus]
+      .where((status) => status == 'Not visited')
+      .length;
+
+  String get visitCoverageLabel {
+    if (!isVisitTrackable) return 'No visit plan';
+
+    if (hasNotVisited && visitsCompleted > 0) {
+      final completedLabel = visitsCompleted == 1
+          ? '1 visit completed'
+          : '$visitsCompleted visits completed';
+      final notVisitedLabel = notVisitedCount == 1
+          ? '1 visit marked not visited'
+          : '$notVisitedCount visits marked not visited';
+      return '$completedLabel, $notVisitedLabel';
+    }
+
+    if (hasNotVisited) {
+      return notVisitedCount == 1
+          ? '1 visit marked not visited'
+          : '$notVisitedCount visits marked not visited';
+    }
+
+    return '$visitsCompleted of $expectedSupervisorVisits visits recorded';
+  }
 }
 
 class DistrictAllocationStat {
@@ -93,16 +139,13 @@ int _countApprovedOrImportedProfiles({
 /// Provider that fetches all admin statistics
 final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
   final firestore = ref.watch(firestoreProvider);
-  
+
   try {
     // Align overview counts with the operational profile collections while
     // still respecting approval state when a matching user account exists.
     final results = await Future.wait([
       firestore.collection('students').get(),
-      firestore
-          .collection('users')
-          .where('role', isEqualTo: 'student')
-          .get(),
+      firestore.collection('users').where('role', isEqualTo: 'student').get(),
       firestore.collection('supervisorProfiles').get(),
       firestore
           .collection('users')
@@ -126,7 +169,8 @@ final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
     final pendingApprovals = (results[4] as AggregateQuerySnapshot).count ?? 0;
 
     final placementsSnapshot = await firestore.collection('placements').get();
-    final companiesSnapshot = await firestore.collection('companies').count().get();
+    final companiesSnapshot =
+        await firestore.collection('companies').count().get();
 
     final placementDocs = placementsSnapshot.docs;
     final activeInternships = placementDocs.where((doc) {
@@ -191,22 +235,36 @@ String _titleCase(String value) {
       .join(' ');
 }
 
+String _visitStatusLabel(SupervisorVisitStatus status) {
+  switch (status) {
+    case SupervisorVisitStatus.visited:
+      return 'Visited';
+    case SupervisorVisitStatus.notVisited:
+      return 'Not visited';
+    case SupervisorVisitStatus.pending:
+      return 'Pending';
+  }
+}
+
 final studentPlacementReportProvider =
     FutureProvider<List<StudentPlacementReportRow>>((ref) async {
   final firestore = ref.watch(firestoreProvider);
 
   final studentsSnapshot = await firestore.collection('students').get();
   final placementsSnapshot = await firestore.collection('placements').get();
-  final supervisorsSnapshot = await firestore.collection('supervisorProfiles').get();
+  final supervisorsSnapshot =
+      await firestore.collection('supervisorProfiles').get();
   final companiesSnapshot = await firestore.collection('companies').get();
 
   final placementsById = {
-    for (final doc in placementsSnapshot.docs) doc.id: doc.data(),
+    for (final doc in placementsSnapshot.docs)
+      doc.id: PlacementModel.fromFirestore(doc, null),
   };
   final placementsByStudentId = {
     for (final doc in placementsSnapshot.docs)
       if ((doc.data()['studentId'] as String?) != null)
-        doc.data()['studentId'] as String: doc.data(),
+        doc.data()['studentId'] as String:
+            PlacementModel.fromFirestore(doc, null),
   };
   final supervisorsById = {
     for (final doc in supervisorsSnapshot.docs) doc.id: doc.data(),
@@ -221,21 +279,32 @@ final studentPlacementReportProvider =
     final placement = currentPlacementId != null
         ? placementsById[currentPlacementId]
         : placementsByStudentId[doc.id];
-    final companyId = placement?['companyId'] as String?;
+    final companyId = placement?.companyId;
     final company = companyId != null ? companiesById[companyId] : null;
     final supervisorId = data['currentSupervisorId'] as String?;
-    final supervisor = supervisorId != null ? supervisorsById[supervisorId] : null;
+    final supervisor =
+        supervisorId != null ? supervisorsById[supervisorId] : null;
+    final visitSlots =
+        placement?.supervisorVisitSlots ?? const <SupervisorVisitRecord>[];
+    final visitOneStatus =
+        visitSlots.isEmpty ? 'N/A' : _visitStatusLabel(visitSlots[0].status);
+    final visitTwoStatus =
+        visitSlots.length < 2 ? 'N/A' : _visitStatusLabel(visitSlots[1].status);
+    final visitsCompleted = visitSlots
+        .where((visit) => visit.status == SupervisorVisitStatus.visited)
+        .length;
 
     return StudentPlacementReportRow(
       studentName: (data['fullName'] as String?) ?? 'Unknown student',
-      registrationNumber:
-          (data['registrationNumber'] as String?) ?? 'N/A',
+      registrationNumber: (data['registrationNumber'] as String?) ?? 'N/A',
       program: (data['program'] as String?) ?? 'N/A',
-      internshipStatus:
-          (data['internshipStatus'] as String?) ?? 'notStarted',
+      internshipStatus: (data['internshipStatus'] as String?) ?? 'notStarted',
       supervisorName: (supervisor?['fullName'] as String?) ?? 'Not assigned',
       companyName: (company?['name'] as String?) ?? 'Not yet allocated',
       district: _normalizeDistrict(company),
+      visitOneStatus: visitOneStatus,
+      visitTwoStatus: visitTwoStatus,
+      visitsCompleted: visitsCompleted,
     );
   }).toList()
     ..sort((a, b) => a.studentName.compareTo(b.studentName));
@@ -273,14 +342,14 @@ final districtAllocationStatsProvider =
 /// Get total users count (all roles, approved only)
 final totalUsersProvider = FutureProvider<int>((ref) async {
   final firestore = ref.watch(firestoreProvider);
-  
+
   try {
     final snapshot = await firestore
         .collection('users')
         .where('isApproved', isEqualTo: true)
         .count()
         .get();
-    
+
     return snapshot.count ?? 0;
   } catch (e) {
     return 0;
@@ -290,22 +359,20 @@ final totalUsersProvider = FutureProvider<int>((ref) async {
 /// Get supervisor load distribution
 /// Returns a map of supervisor ID to number of assigned students
 final supervisorLoadProvider = FutureProvider<Map<String, int>>((ref) async {
-  final firestore = ref.watch(firestoreProvider);
-  
   try {
     // TODO: Implement based on your assignments collection structure
     // Example:
     // final assignments = await firestore
     //     .collection('supervisor_assignments')
     //     .get();
-    // 
+    //
     // final loadMap = <String, int>{};
     // for (final doc in assignments.docs) {
     //   final supervisorId = doc.data()['supervisorId'] as String;
     //   loadMap[supervisorId] = (loadMap[supervisorId] ?? 0) + 1;
     // }
     // return loadMap;
-    
+
     return {};
   } catch (e) {
     return {};
@@ -313,21 +380,24 @@ final supervisorLoadProvider = FutureProvider<Map<String, int>>((ref) async {
 });
 
 /// Get recent activity/registrations
-final recentActivityProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final recentActivityProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final firestore = ref.watch(firestoreProvider);
-  
+
   try {
     final snapshot = await firestore
         .collection('users')
         .orderBy('createdAt', descending: true)
         .limit(10)
         .get();
-    
-    return snapshot.docs.map((doc) => {
-      'type': 'registration',
-      'user': doc.data(),
-      'timestamp': doc.data()['createdAt'],
-    }).toList();
+
+    return snapshot.docs
+        .map((doc) => {
+              'type': 'registration',
+              'user': doc.data(),
+              'timestamp': doc.data()['createdAt'],
+            })
+        .toList();
   } catch (e) {
     return [];
   }

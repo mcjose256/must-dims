@@ -34,23 +34,22 @@ final allocationSupervisorsProvider =
       .collection('supervisorProfiles')
       .snapshots()
       .map((snapshot) {
-        final supervisors = <_AllocationSupervisorRecord>[];
+    final supervisors = <_AllocationSupervisorRecord>[];
 
-        for (final doc in snapshot.docs) {
-          try {
-            supervisors.add(_AllocationSupervisorRecord.fromSnapshot(doc));
-          } catch (error) {
-            debugPrint('Failed to parse supervisor ${doc.id}: $error');
-          }
-        }
+    for (final doc in snapshot.docs) {
+      try {
+        supervisors.add(_AllocationSupervisorRecord.fromSnapshot(doc));
+      } catch (error) {
+        debugPrint('Failed to parse supervisor ${doc.id}: $error');
+      }
+    }
 
-        supervisors.sort(
-          (left, right) => left.fullName
-              .toLowerCase()
-              .compareTo(right.fullName.toLowerCase()),
-        );
-        return supervisors;
-      });
+    supervisors.sort(
+      (left, right) =>
+          left.fullName.toLowerCase().compareTo(right.fullName.toLowerCase()),
+    );
+    return supervisors;
+  });
 });
 
 final lastAssignmentResultProvider = StateProvider<String?>((ref) => null);
@@ -358,7 +357,8 @@ class _SupervisorAllocationPageState
     AsyncValue<List<_AllocationStudentRecord>> studentsAsync,
   ) {
     final unassignedCount = studentsAsync.maybeWhen(
-      data: (students) => students.where((student) => !student.isAssigned).length,
+      data: (students) =>
+          students.where((student) => !student.isAssigned).length,
       orElse: () => 0,
     );
 
@@ -504,7 +504,8 @@ class _SupervisorAllocationPageState
                             final currentSupervisorName =
                                 student.currentSupervisorId == null
                                     ? 'Not assigned'
-                                    : (supervisorNames[student.currentSupervisorId] ??
+                                    : (supervisorNames[
+                                            student.currentSupervisorId] ??
                                         'Assigned');
                             return DataRow(
                               cells: [
@@ -554,8 +555,8 @@ class _SupervisorAllocationPageState
                                             student,
                                             supervisors,
                                           ),
-                                          icon:
-                                              const Icon(Icons.person_add_alt_1),
+                                          icon: const Icon(
+                                              Icons.person_add_alt_1),
                                           label: Text(
                                             student.isAssigned
                                                 ? 'Reassign'
@@ -688,8 +689,9 @@ class _SupervisorAllocationPageState
     );
 
     try {
-      final result =
-          await FirebaseFunctions.instance.httpsCallable('assignSupervisors').call(
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('assignSupervisors')
+          .call(
         {
           'reAssignAll': false,
         },
@@ -741,13 +743,12 @@ class _SupervisorAllocationPageState
       currentSupervisorName =
           matches.isEmpty ? 'Assigned' : matches.first.fullName;
     }
-    final availableSupervisors = supervisors
-        .where((supervisor) => supervisor.hasCapacity)
-        .toList()
-      ..sort(
-        (left, right) => _manualSupervisorScore(right, student)
-            .compareTo(_manualSupervisorScore(left, student)),
-      );
+    final availableSupervisors =
+        supervisors.where((supervisor) => supervisor.hasCapacity).toList()
+          ..sort(
+            (left, right) => _manualSupervisorScore(right, student)
+                .compareTo(_manualSupervisorScore(left, student)),
+          );
 
     if (availableSupervisors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -765,7 +766,8 @@ class _SupervisorAllocationPageState
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(student.isAssigned ? 'Reassign Student' : 'Assign Student'),
+          title:
+              Text(student.isAssigned ? 'Reassign Student' : 'Assign Student'),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -815,7 +817,8 @@ class _SupervisorAllocationPageState
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(student.isAssigned ? 'Reassign Student' : 'Assign Student'),
+              child: Text(
+                  student.isAssigned ? 'Reassign Student' : 'Assign Student'),
             ),
           ],
         ),
@@ -1161,8 +1164,12 @@ class _AllocationSupervisorRecord {
   ) {
     final data = snapshot.data() ?? <String, dynamic>{};
     final rawMaxStudents = data['maxStudents'];
-    final parsedMaxStudents =
-        rawMaxStudents is num ? rawMaxStudents.toInt() : _defaultSupervisorCapacity;
+    final parsedMaxStudents = rawMaxStudents is num
+        ? rawMaxStudents.toInt()
+        : _defaultSupervisorCapacity;
+    final effectiveMaxStudents = parsedMaxStudents < _defaultSupervisorCapacity
+        ? _defaultSupervisorCapacity
+        : parsedMaxStudents;
 
     return _AllocationSupervisorRecord(
       id: snapshot.id,
@@ -1170,12 +1177,13 @@ class _AllocationSupervisorRecord {
           _readString(data, ['fullName', 'FullName']) ?? 'Unknown Supervisor',
       department: _readString(data, ['department']) ?? '',
       programSpecialties: _readStringList(data['programSpecialties']),
-      currentLoad: data['currentLoad'] is num
-          ? (data['currentLoad'] as num).toInt()
-          : 0,
-      maxStudents:
-          parsedMaxStudents <= 0 ? _defaultSupervisorCapacity : parsedMaxStudents,
-      isAvailable: data['isAvailable'] is bool ? data['isAvailable'] as bool : true,
+      currentLoad:
+          data['currentLoad'] is num ? (data['currentLoad'] as num).toInt() : 0,
+      maxStudents: effectiveMaxStudents <= 0
+          ? _defaultSupervisorCapacity
+          : effectiveMaxStudents,
+      isAvailable:
+          data['isAvailable'] is bool ? data['isAvailable'] as bool : true,
     );
   }
 }
