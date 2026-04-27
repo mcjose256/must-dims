@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dims/features/auth/data/models/user_model.dart';
 import 'package:dims/features/student/data/models/student_profile_model.dart';
@@ -10,11 +11,12 @@ final firestoreProvider = Provider((ref) => FirebaseFirestore.instance);
 final authStateProvider = StreamProvider<UserModel?>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   final firestore = ref.watch(firestoreProvider);
-  
+
   return auth.authStateChanges().asyncMap((firebaseUser) async {
     if (firebaseUser == null) return null;
     try {
-      final doc = await firestore.collection('users').doc(firebaseUser.uid).get();
+      final doc =
+          await firestore.collection('users').doc(firebaseUser.uid).get();
       if (!doc.exists) return null;
       return UserModel.fromFirestore(doc, null);
     } catch (e) {
@@ -28,10 +30,10 @@ final authControllerProvider = Provider((ref) => AuthController(ref));
 class AuthController {
   final Ref _ref;
   AuthController(this._ref);
-  
+
   FirebaseAuth get _auth => _ref.read(firebaseAuthProvider);
   FirebaseFirestore get _db => _ref.read(firestoreProvider);
-  
+
   /// Sign in with email and password
   Future<void> signIn(String email, String password) async {
     try {
@@ -45,7 +47,7 @@ class AuthController {
       throw Exception('Login failed: ${e.toString()}');
     }
   }
-  
+
   /// Sign up new user with role-specific profiles
   /// NOTE: For students, department is ignored - program is set in CompleteProfilePage
   Future<void> signUp({
@@ -56,19 +58,19 @@ class AuthController {
     required String department, // Only used for supervisors
   }) async {
     UserCredential? credential;
-    
+
     try {
       // 1. Create Auth User
       credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       final uid = credential.user!.uid;
-      
+
       // Update display name
       await credential.user!.updateDisplayName(fullName);
-      
+
       // 2. Create the BASE User document (for login & role system)
       final newUser = UserModel(
         uid: uid,
@@ -78,11 +80,11 @@ class AuthController {
         isApproved: false, // Wait for admin
         createdAt: DateTime.now(),
       );
-      
+
       await _db.collection('users').doc(uid).set(
-        UserModel.toFirestore(newUser, null),
-      );
-      
+            UserModel.toFirestore(newUser, null),
+          );
+
       // 3. Create the ROLE-SPECIFIC document (for the Dashboard)
       await _createRoleSpecificProfile(
         uid: uid,
@@ -91,7 +93,6 @@ class AuthController {
         email: email,
         department: department,
       );
-      
     } on FirebaseAuthException catch (e) {
       // If user creation failed, clean up any partial data
       if (credential?.user != null) {
@@ -106,7 +107,7 @@ class AuthController {
       throw Exception('Registration failed: ${e.toString()}');
     }
   }
-  
+
   /// Create role-specific profile in Firestore
   Future<void> _createRoleSpecificProfile({
     required String uid,
@@ -141,11 +142,11 @@ class AuthController {
         currentSupervisorId: null,
       );
       await _db.collection('students').doc(uid).set(
-        initialStudent.toFirestore(),
-      );
+            initialStudent.toFirestore(),
+          );
     }
   }
-  
+
   /// Clean up partial data if registration fails
   Future<void> _cleanupFailedRegistration(String uid) async {
     try {
@@ -155,7 +156,7 @@ class AuthController {
         _db.collection('supervisorProfiles').doc(uid).delete(),
         _db.collection('students').doc(uid).delete(),
       ]);
-      
+
       // Try to delete the auth user
       final currentUser = _auth.currentUser;
       if (currentUser?.uid == uid) {
@@ -163,10 +164,10 @@ class AuthController {
       }
     } catch (e) {
       // Silently fail cleanup - not critical
-      print('Cleanup failed: $e');
+      debugPrint('Cleanup failed: $e');
     }
   }
-  
+
   /// Create user profile directly (for bypass scenarios)
   Future<void> createUserProfile({
     required String uid,
@@ -185,11 +186,11 @@ class AuthController {
         isApproved: false,
         createdAt: DateTime.now(),
       );
-      
+
       await _db.collection('users').doc(uid).set(
-        UserModel.toFirestore(newUser, null),
-      );
-      
+            UserModel.toFirestore(newUser, null),
+          );
+
       // Create role-specific profile
       await _createRoleSpecificProfile(
         uid: uid,
@@ -202,11 +203,11 @@ class AuthController {
       throw Exception('Failed to create user profile: ${e.toString()}');
     }
   }
-  
+
   /// Handle Firebase Auth exceptions with user-friendly messages
   Exception _handleAuthException(FirebaseAuthException e) {
     String message;
-    
+
     switch (e.code) {
       case 'email-already-in-use':
         message = 'This email is already registered. Try logging in instead.';
@@ -215,7 +216,8 @@ class AuthController {
         message = 'Invalid email address format.';
         break;
       case 'operation-not-allowed':
-        message = 'Email/password accounts are not enabled. Contact administrator.';
+        message =
+            'Email/password accounts are not enabled. Contact administrator.';
         break;
       case 'weak-password':
         message = 'Password is too weak. Use at least 6 characters.';
@@ -241,17 +243,18 @@ class AuthController {
       default:
         // Handle 403/permission errors
         if (e.message?.contains('403') ?? false) {
-          message = 'Authentication service is temporarily unavailable. Please contact administrator.';
+          message =
+              'Authentication service is temporarily unavailable. Please contact administrator.';
         } else if (e.message?.contains('PERMISSION_DENIED') ?? false) {
           message = 'Permission denied. Please contact administrator.';
         } else {
           message = e.message ?? 'Authentication failed. Please try again.';
         }
     }
-    
+
     return Exception(message);
   }
-  
+
   /// Sign out current user
   Future<void> signOut() async {
     try {
@@ -260,7 +263,7 @@ class AuthController {
       throw Exception('Sign out failed: ${e.toString()}');
     }
   }
-  
+
   /// Reset password
   Future<void> resetPassword(String email) async {
     try {
@@ -271,10 +274,10 @@ class AuthController {
       throw Exception('Password reset failed: ${e.toString()}');
     }
   }
-  
+
   /// Get current user
   User? get currentUser => _auth.currentUser;
-  
+
   /// Check if user is logged in
   bool get isLoggedIn => _auth.currentUser != null;
 }

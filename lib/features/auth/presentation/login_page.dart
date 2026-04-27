@@ -32,17 +32,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _createDevAdmin() async {
     setState(() => _isLoading = true);
     try {
-      final String adminEmail = "admin@must.ac.ug";
-      final String adminPassword = "admin123password";
+      const String adminEmail = "admin@must.ac.ug";
+      const String adminPassword = "admin123password";
 
       // 1. Create the Auth User
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: adminEmail,
         password: adminPassword,
       );
 
       // 2. Create the Firestore Document with Admin Role and Approved status
-      await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).set({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(credential.user!.uid)
+          .set({
         'uid': credential.user!.uid,
         'email': adminEmail,
         'role': 'admin', // Matches UserRole.admin.name
@@ -52,7 +56,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Admin created! Use $adminEmail / $adminPassword'),
             backgroundColor: Colors.green,
           ),
@@ -92,6 +96,105 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final resetEmailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+    final resetFormKey = GlobalKey<FormState>();
+    var isSending = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isSending,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> sendResetLink() async {
+              if (!resetFormKey.currentState!.validate()) return;
+
+              setDialogState(() => isSending = true);
+              try {
+                await ref.read(authControllerProvider).resetPassword(
+                      resetEmailController.text.trim(),
+                    );
+
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Password reset link sent. Check your email inbox.',
+                      ),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSending = false);
+                }
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          e.toString().replaceAll('Exception:', '').trim()),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Recover password'),
+              content: Form(
+                key: resetFormKey,
+                child: TextFormField(
+                  controller: resetEmailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.validateEmail,
+                  enabled: !isSending,
+                  autofocus: true,
+                  onFieldSubmitted: (_) => isSending ? null : sendResetLink(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: isSending ? null : sendResetLink,
+                  icon: isSending
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.mark_email_read_outlined),
+                  label: Text(isSending ? 'Sending...' : 'Send reset link'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    resetEmailController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -99,7 +202,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final badgeSize = screenWidth < 380 ? 96.0 : 110.0;
     final badgePadding = badgeSize * 0.18;
-    
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -122,12 +225,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           color: Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: colorScheme.secondary.withOpacity(0.55),
+                            color:
+                                colorScheme.secondary.withValues(alpha: 0.55),
                             width: 2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withOpacity(0.10),
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.10),
                               blurRadius: 18,
                               offset: const Offset(0, 10),
                             ),
@@ -151,7 +256,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   Text(
                     'MUST DIMS',
                     textAlign: TextAlign.center,
@@ -168,7 +273,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Email Address',
                       prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       filled: true,
                     ),
                     keyboardType: TextInputType.emailAddress,
@@ -184,28 +290,47 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       filled: true,
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined),
+                        onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    validator: (val) => val != null && val.isNotEmpty ? null : 'Password is required',
+                    validator: (val) => val != null && val.isNotEmpty
+                        ? null
+                        : 'Password is required',
                     enabled: !_isLoading,
                   ),
-                  
-                  const SizedBox(height: 24),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                      child: const Text('Forgot password?'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // Login Button
                   FilledButton(
                     onPressed: _isLoading ? null : _login,
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: _isLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
                         : const Text('Sign In', style: TextStyle(fontSize: 16)),
                   ),
 
@@ -217,8 +342,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     children: [
                       const Text("Don't have an account?"),
                       TextButton(
-                        onPressed: _isLoading ? null : () => context.go('/register'),
-                        child: const Text('Register', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed:
+                            _isLoading ? null : () => context.go('/register'),
+                        child: const Text('Register',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
